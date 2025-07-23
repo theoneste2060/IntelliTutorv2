@@ -1,0 +1,39 @@
+Names: NZAKIZWANIMANA Theoneste
+Reg. No: 24RP08786
+Capstone Project: IntelliTutor
+ABSTRACT 
+IntelliTutor is an easy-to-use, web-based system designed to help students practice and improve using real NESA past exam questions. The system lets students answer questions one by one online and get instant feedback, scores, and helpful tips, all powered by advanced AI. It aims to make studying more effective, fun, and personalized for each student.
+Key Features and Functionalities
+•	Automatic Question and Answer Creation:
+System administrators upload past exam papers in PDF/Image format. The system reads these files, breaks them into individual questions, and uses Generative AI to create accurate model answers. These answers are kept hidden until the student answers, so students can try on their own first.
+•	Student-Friendly Question Interface:
+Students log in and see one question at a time. After answering, they get:
+o	A score comparing their answer to the AI’s answer (like 60% or 80%)
+o	Simple, personalized feedback (e.g., “D stands for Database, not Data.”)
+o	Encouragement to try again if their score is low
+•	Gamified Learning:
+To keep students motivated, the system gives badges (such as “Database Master”) and tracks progress with levels by topic and semester. This makes learning feel like a game and helps students see their improvement over time.
+•	Smart Question Recommendation:
+Each question is related by subject, level, and learning outcome. The system suggests questions and feedback that match each student’s academic level, making practice more relevant and helpful.
+
+
+
+•	Dashboard for Administrators:
+Admins have tools to:
+o	Upload and manage exam papers
+o	Check and approve AI-generated answers
+o	Organize questions by topic and curriculum
+o	See detailed reports on student progress and question performance
+Technology:
+•	Frontend: HTML, CSS, JavaScript
+•	Backend: Python (Flask)
+•	PDF reading: OCR
+•	Model Answer Generation: genAI
+•	Answer Evaluation: nltk, gensim (TF-IDF), spaCy (rule matching)
+•	Feedback Generation:  language_tool_python, pyenchant (spelling)
+•	Recommendations: TF-IDF vectorization + Cosine similarity
+•	Database: SQLiteDB
+•	Authentication: google aouth
+
+
+
