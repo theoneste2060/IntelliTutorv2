@@ -1,0 +1,342 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import multer from "multer";
+import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { openaiService } from "./services/openai";
+import { nlpService } from "./services/nlp";
+import { ocrService } from "./services/ocr";
+import { insertExamPaperSchema, insertQuestionSchema, insertStudentAnswerSchema } from "@shared/schema";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Dashboard endpoints
+  app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role === 'admin') {
+        const stats = await storage.getAdminStats();
+        res.json(stats);
+      } else {
+        const stats = await storage.getStudentStats(userId);
+        res.json(stats);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get('/api/dashboard/badges', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const badges = await storage.getUserBadges(userId);
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  // Question practice endpoints
+  app.get('/api/questions/next', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subject } = req.query;
+      
+      // Get personalized recommendations first
+      const recommendations = await storage.getQuestionRecommendations(userId, 1);
+      
+      if (recommendations.length > 0) {
+        const question = await storage.getQuestion(recommendations[0].questionId!);
+        res.json(question);
+      } else {
+        // Fallback to subject-based questions
+        const questions = await storage.getQuestionsBySubject(subject as string || 'Computer Science', 1);
+        res.json(questions[0] || null);
+      }
+    } catch (error) {
+      console.error("Error fetching next question:", error);
+      res.status(500).json({ message: "Failed to fetch next question" });
+    }
+  });
+
+  app.post('/api/questions/:id/answer', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const questionId = parseInt(req.params.id);
+      const { answerText, timeSpent } = req.body;
+
+      // Get the question and its model answer
+      const question = await storage.getQuestion(questionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+
+      // Evaluate the answer using NLP
+      const nlpEvaluation = nlpService.evaluateAnswer(
+        answerText,
+        question.aiModelAnswer || "",
+        question.questionText
+      );
+
+      // Get AI evaluation for enhanced feedback
+      const aiEvaluation = await openaiService.evaluateStudentAnswer(
+        question.questionText,
+        answerText,
+        question.aiModelAnswer || "",
+        question.subject
+      );
+
+      // Combine evaluations
+      const finalScore = Math.round((nlpEvaluation.overallScore + aiEvaluation.score) / 2);
+      const combinedFeedback = [
+        ...nlpEvaluation.feedback,
+        aiEvaluation.feedback,
+        ...aiEvaluation.improvements
+      ].join('. ');
+
+      // Save the student answer
+      const studentAnswer = await storage.createStudentAnswer({
+        studentId: userId,
+        questionId,
+        answerText,
+        score: finalScore,
+        feedback: combinedFeedback,
+        evaluationDetails: {
+          nlp: nlpEvaluation,
+          ai: aiEvaluation,
+        },
+        timeSpent,
+        isCorrect: finalScore >= 70,
+      });
+
+      // Update user stats
+      const user = await storage.getUser(userId);
+      if (user) {
+        await storage.upsertUser({
+          ...user,
+          questionsCompleted: (user.questionsCompleted || 0) + 1,
+          totalScore: (user.totalScore || 0) + finalScore,
+        });
+      }
+
+      res.json({
+        score: finalScore,
+        feedback: combinedFeedback,
+        evaluationBreakdown: {
+          tfidfScore: nlpEvaluation.tfidfScore,
+          semanticScore: nlpEvaluation.semanticScore,
+          grammarScore: nlpEvaluation.grammarScore,
+        },
+        strengths: aiEvaluation.strengths,
+        improvements: aiEvaluation.improvements,
+      });
+    } catch (error) {
+      console.error("Error evaluating answer:", error);
+      res.status(500).json({ message: "Failed to evaluate answer" });
+    }
+  });
+
+  // Admin endpoints
+  app.post('/api/admin/upload-paper', isAuthenticated, upload.single('examPaper'), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { title, subject, year, level } = req.body;
+      
+      // Validate the document
+      await ocrService.validateDocument(req.file.buffer, req.file.originalname);
+
+      // Create exam paper record
+      const examPaper = await storage.createExamPaper({
+        title,
+        subject,
+        year: parseInt(year),
+        level,
+        fileName: req.file.originalname,
+        fileUrl: `/uploads/${req.file.originalname}`, // In production, upload to cloud storage
+        uploadedBy: userId,
+        status: 'processing',
+      });
+
+      // Process the document with OCR in background
+      processDocumentAsync(examPaper.id, req.file.buffer, req.file.originalname);
+
+      res.json({ 
+        message: "Exam paper uploaded successfully", 
+        examPaperId: examPaper.id,
+        status: 'processing'
+      });
+    } catch (error) {
+      console.error("Error uploading exam paper:", error);
+      res.status(500).json({ message: error.message || "Failed to upload exam paper" });
+    }
+  });
+
+  app.get('/api/admin/questions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { subject, verified } = req.query;
+      let questions = await storage.getQuestions();
+
+      // Filter by subject if provided
+      if (subject && subject !== 'all') {
+        questions = questions.filter(q => q.subject === subject);
+      }
+
+      // Filter by verification status if provided
+      if (verified !== undefined) {
+        questions = questions.filter(q => q.isVerified === (verified === 'true'));
+      }
+
+      res.json(questions);
+    } catch (error) {
+      console.error("Error fetching admin questions:", error);
+      res.status(500).json({ message: "Failed to fetch questions" });
+    }
+  });
+
+  app.post('/api/admin/questions/:id/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const questionId = parseInt(req.params.id);
+      const { isVerified } = req.body;
+
+      await storage.updateQuestionVerification(questionId, isVerified, userId);
+      
+      res.json({ message: "Question verification updated" });
+    } catch (error) {
+      console.error("Error updating question verification:", error);
+      res.status(500).json({ message: "Failed to update question verification" });
+    }
+  });
+
+  // Progress and recommendations endpoints
+  app.get('/api/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getStudentProgress(userId);
+      
+      // Get recent answers for recommendations
+      const recentAnswers = await storage.getStudentAnswers(userId);
+      const answerData = recentAnswers.slice(0, 10).map(answer => ({
+        questionText: '', // Would need to join with questions table
+        score: answer.score,
+        subject: '', // Would need to join with questions table
+        topic: '',
+      }));
+
+      // Generate AI recommendations
+      const aiRecommendations = await openaiService.generatePersonalizedRecommendations(
+        userId,
+        answerData
+      );
+
+      res.json({
+        ...progress,
+        recommendations: aiRecommendations,
+      });
+    } catch (error) {
+      console.error("Error fetching progress:", error);
+      res.status(500).json({ message: "Failed to fetch progress" });
+    }
+  });
+
+  // Background processing function
+  async function processDocumentAsync(examPaperId: number, fileBuffer: Buffer, fileName: string) {
+    try {
+      // Process with OCR
+      const ocrResult = await ocrService.processDocument(fileBuffer, fileName);
+      
+      // Extract questions using AI
+      const subject = fileName.includes('CS') ? 'Computer Science' : 'General Studies';
+      const questionExtractionResult = await openaiService.extractQuestionsFromText(
+        ocrResult.text,
+        subject
+      );
+
+      // Save extracted questions
+      let questionsCreated = 0;
+      for (const extractedQuestion of questionExtractionResult.questions) {
+        // Generate model answer
+        const modelAnswerResult = await openaiService.generateModelAnswer(
+          extractedQuestion.questionText,
+          extractedQuestion.subject
+        );
+
+        // Create question record
+        await storage.createQuestion({
+          examPaperId,
+          questionNumber: extractedQuestion.questionNumber,
+          questionText: extractedQuestion.questionText,
+          subject: extractedQuestion.subject,
+          topic: extractedQuestion.topic,
+          difficulty: extractedQuestion.difficulty,
+          learningOutcome: extractedQuestion.learningOutcome,
+          aiModelAnswer: modelAnswerResult.modelAnswer,
+          aiConfidence: modelAnswerResult.confidence,
+          isVerified: false,
+        });
+
+        questionsCreated++;
+      }
+
+      // Update exam paper status
+      await storage.updateExamPaperStatus(examPaperId, 'completed', questionsCreated);
+      
+      console.log(`Successfully processed exam paper ${examPaperId}: ${questionsCreated} questions extracted`);
+    } catch (error) {
+      console.error(`Error processing exam paper ${examPaperId}:`, error);
+      await storage.updateExamPaperStatus(examPaperId, 'failed');
+    }
+  }
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
