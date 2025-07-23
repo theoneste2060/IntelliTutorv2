@@ -6,7 +6,6 @@ import {
   badges,
   userBadges,
   studySessions,
-  questionRecommendations,
   type User,
   type UpsertUser,
   type ExamPaper,
@@ -20,7 +19,7 @@ import {
   type UserBadge,
   type StudySession,
   type InsertStudySession,
-  type QuestionRecommendation,
+
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, avg } from "drizzle-orm";
@@ -28,6 +27,8 @@ import { eq, desc, and, sql, count, avg } from "drizzle-orm";
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: any): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Exam Paper operations
@@ -59,9 +60,7 @@ export interface IStorage {
   getStudySessions(studentId: string): Promise<StudySession[]>;
   updateStudySession(id: number, updates: Partial<StudySession>): Promise<void>;
   
-  // Recommendation operations
-  createQuestionRecommendation(recommendation: Omit<QuestionRecommendation, 'id' | 'createdAt'>): Promise<QuestionRecommendation>;
-  getQuestionRecommendations(studentId: string, limit?: number): Promise<QuestionRecommendation[]>;
+
   
   // Analytics
   getAdminStats(): Promise<any>;
@@ -75,19 +74,36 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
+  }
+
+  async createUser(userData: any): Promise<User> {
+    const [user] = await db.insert(users).values({
+      ...userData,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }).returning();
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    try {
+      const [user] = await db.insert(users).values({
+        ...userData,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }).returning();
+      return user;
+    } catch (error) {
+      // If insert fails due to conflict, update the existing user
+      const [user] = await db.update(users)
+        .set({ ...userData, updatedAt: Date.now() })
+        .where(eq(users.id, userData.id!))
+        .returning();
+      return user;
+    }
   }
 
   // Exam Paper operations

@@ -1,147 +1,135 @@
 import {
-  pgTable,
+  sqliteTable,
   text,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-  serial,
   integer,
-  boolean,
   real,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
+// Session storage table for authentication
+export const sessions = sqliteTable("sessions", {
+  sid: text("sid").primaryKey(),
+  sess: text("sess").notNull(),
+  expire: integer("expire").notNull(),
+});
 
 // User storage table
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").default("student"), // student, admin
-  currentLevel: varchar("current_level").default("Beginner"),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey().notNull(),
+  email: text("email").unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  profileImageUrl: text("profile_image_url"),
+  role: text("role").default("student"), // student, admin
+  currentLevel: text("current_level").default("Beginner"),
   totalScore: integer("total_score").default(0),
   questionsCompleted: integer("questions_completed").default(0),
   studyStreak: integer("study_streak").default(0),
-  lastActiveDate: timestamp("last_active_date"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  lastActiveDate: integer("last_active_date"),
+  createdAt: integer("created_at").default(Date.now()),
+  updatedAt: integer("updated_at").default(Date.now()),
 });
 
 // Exam papers uploaded by admins
-export const examPapers = pgTable("exam_papers", {
-  id: serial("id").primaryKey(),
+export const examPapers = sqliteTable("exam_papers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
-  subject: varchar("subject").notNull(),
+  subject: text("subject").notNull(),
   year: integer("year").notNull(),
-  level: varchar("level").notNull(), // O-Level, A-Level
+  level: text("level").notNull(), // O-Level, A-Level
   fileName: text("file_name").notNull(),
   fileUrl: text("file_url").notNull(),
-  status: varchar("status").default("processing"), // processing, completed, failed
+  status: text("status").default("processing"), // processing, completed, failed
   totalQuestions: integer("total_questions").default(0),
-  uploadedBy: varchar("uploaded_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  uploadedBy: text("uploaded_by").references(() => users.id),
+  createdAt: integer("created_at").default(Date.now()),
 });
 
 // Individual questions extracted from exam papers
-export const questions = pgTable("questions", {
-  id: serial("id").primaryKey(),
+export const questions = sqliteTable("questions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   examPaperId: integer("exam_paper_id").references(() => examPapers.id),
   questionNumber: integer("question_number").notNull(),
   questionText: text("question_text").notNull(),
-  subject: varchar("subject").notNull(),
-  topic: varchar("topic"),
-  difficulty: varchar("difficulty").default("medium"), // easy, medium, hard
+  subject: text("subject").notNull(),
+  topic: text("topic"),
+  difficulty: text("difficulty").default("medium"), // easy, medium, hard
   learningOutcome: text("learning_outcome"),
   aiModelAnswer: text("ai_model_answer"),
   aiConfidence: real("ai_confidence").default(0),
-  isVerified: boolean("is_verified").default(false),
-  verifiedBy: varchar("verified_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
+  isVerified: integer("is_verified", { mode: 'boolean' }).default(false),
+  verifiedBy: text("verified_by").references(() => users.id),
+  createdAt: integer("created_at").default(Date.now()),
 });
 
 // Student answers and evaluations
-export const studentAnswers = pgTable("student_answers", {
-  id: serial("id").primaryKey(),
-  studentId: varchar("student_id").references(() => users.id),
+export const studentAnswers = sqliteTable("student_answers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: text("student_id").references(() => users.id),
   questionId: integer("question_id").references(() => questions.id),
   answerText: text("answer_text").notNull(),
   score: real("score").notNull(), // 0-100
   feedback: text("feedback"),
-  evaluationDetails: jsonb("evaluation_details"), // TF-IDF, grammar scores etc
+  evaluationDetails: text("evaluation_details"), // JSON string instead of jsonb
   timeSpent: integer("time_spent"), // seconds
   attempts: integer("attempts").default(1),
-  isCorrect: boolean("is_correct").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  isCorrect: integer("is_correct", { mode: 'boolean' }).default(false),
+  createdAt: integer("created_at").default(Date.now()),
 });
 
 // Badges and achievements
-export const badges = pgTable("badges", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull(),
+export const badges = sqliteTable("badges", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
   description: text("description"),
-  icon: varchar("icon"), // FontAwesome icon class
-  color: varchar("color"), // CSS color for gradient
-  criteria: jsonb("criteria"), // Conditions to earn badge
-  createdAt: timestamp("created_at").defaultNow(),
+  icon: text("icon"), // FontAwesome icon class
+  color: text("color"), // CSS color for gradient
+  criteria: text("criteria"), // JSON string for conditions to earn badge
+  createdAt: integer("created_at").default(Date.now()),
 });
 
 // User badge achievements
-export const userBadges = pgTable("user_badges", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").references(() => users.id),
+export const userBadges = sqliteTable("user_badges", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").references(() => users.id),
   badgeId: integer("badge_id").references(() => badges.id),
-  earnedAt: timestamp("earned_at").defaultNow(),
+  earnedAt: integer("earned_at").default(Date.now()),
 });
 
 // Study sessions for progress tracking
-export const studySessions = pgTable("study_sessions", {
-  id: serial("id").primaryKey(),
-  studentId: varchar("student_id").references(() => users.id),
-  startTime: timestamp("start_time").notNull(),
-  endTime: timestamp("end_time"),
-  questionsAnswered: integer("questions_answered").default(0),
-  averageScore: real("average_score").default(0),
-  subject: varchar("subject"),
-  totalTimeSpent: integer("total_time_spent").default(0), // seconds
+export const studySessions = sqliteTable("study_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: text("student_id").references(() => users.id),
+  startTime: integer("start_time").notNull(),
+  endTime: integer("end_time"),
+  questionsAttempted: integer("questions_attempted").default(0),
+  correctAnswers: integer("correct_answers").default(0),
+  totalScore: real("total_score").default(0),
+  avgTimePerQuestion: real("avg_time_per_question"),
+  createdAt: integer("created_at").default(Date.now()),
 });
 
-// Question recommendations
-export const questionRecommendations = pgTable("question_recommendations", {
-  id: serial("id").primaryKey(),
-  studentId: varchar("student_id").references(() => users.id),
-  questionId: integer("question_id").references(() => questions.id),
-  recommendationScore: real("recommendation_score").notNull(),
-  reason: text("reason"),
-  isUsed: boolean("is_used").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+// Admin users for credential-based login
+export const adminUsers = sqliteTable("admin_users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  username: text("username").unique().notNull(),
+  password: text("password").notNull(), // hashed password
+  email: text("email"),
+  createdAt: integer("created_at").default(Date.now()),
 });
 
-// Define relations
+// Relations
 export const usersRelations = relations(users, ({ many }) => ({
   examPapers: many(examPapers),
   studentAnswers: many(studentAnswers),
   userBadges: many(userBadges),
   studySessions: many(studySessions),
-  questionRecommendations: many(questionRecommendations),
 }));
 
 export const examPapersRelations = relations(examPapers, ({ one, many }) => ({
-  uploadedByUser: one(users, {
+  uploadedBy: one(users, {
     fields: [examPapers.uploadedBy],
     references: [users.id],
   }),
@@ -153,12 +141,11 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
     fields: [questions.examPaperId],
     references: [examPapers.id],
   }),
-  verifiedByUser: one(users, {
+  verifiedBy: one(users, {
     fields: [questions.verifiedBy],
     references: [users.id],
   }),
   studentAnswers: many(studentAnswers),
-  questionRecommendations: many(questionRecommendations),
 }));
 
 export const studentAnswersRelations = relations(studentAnswers, ({ one }) => ({
@@ -194,54 +181,31 @@ export const studySessionsRelations = relations(studySessions, ({ one }) => ({
   }),
 }));
 
-export const questionRecommendationsRelations = relations(questionRecommendations, ({ one }) => ({
-  student: one(users, {
-    fields: [questionRecommendations.studentId],
-    references: [users.id],
-  }),
-  question: one(questions, {
-    fields: [questionRecommendations.questionId],
-    references: [questions.id],
-  }),
-}));
+// Zod schemas for validation
+export const insertUserSchema = createInsertSchema(users);
+export const insertExamPaperSchema = createInsertSchema(examPapers);
+export const insertQuestionSchema = createInsertSchema(questions);
+export const insertStudentAnswerSchema = createInsertSchema(studentAnswers);
+export const insertBadgeSchema = createInsertSchema(badges);
+export const insertUserBadgeSchema = createInsertSchema(userBadges);
+export const insertStudySessionSchema = createInsertSchema(studySessions);
+export const insertAdminUserSchema = createInsertSchema(adminUsers);
 
-// Insert schemas
-export const insertExamPaperSchema = createInsertSchema(examPapers).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertQuestionSchema = createInsertSchema(questions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertStudentAnswerSchema = createInsertSchema(studentAnswers).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertBadgeSchema = createInsertSchema(badges).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertStudySessionSchema = createInsertSchema(studySessions).omit({
-  id: true,
-});
-
-// Types
-export type UpsertUser = typeof users.$inferInsert;
+// Type exports
 export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type UpsertUser = typeof users.$inferInsert;
 export type ExamPaper = typeof examPapers.$inferSelect;
-export type InsertExamPaper = z.infer<typeof insertExamPaperSchema>;
+export type InsertExamPaper = typeof examPapers.$inferInsert;
 export type Question = typeof questions.$inferSelect;
-export type InsertQuestion = z.infer<typeof insertQuestionSchema>;
+export type InsertQuestion = typeof questions.$inferInsert;
 export type StudentAnswer = typeof studentAnswers.$inferSelect;
-export type InsertStudentAnswer = z.infer<typeof insertStudentAnswerSchema>;
+export type InsertStudentAnswer = typeof studentAnswers.$inferInsert;
 export type Badge = typeof badges.$inferSelect;
-export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type InsertBadge = typeof badges.$inferInsert;
 export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = typeof userBadges.$inferInsert;
 export type StudySession = typeof studySessions.$inferSelect;
-export type InsertStudySession = z.infer<typeof insertStudySessionSchema>;
-export type QuestionRecommendation = typeof questionRecommendations.$inferSelect;
+export type InsertStudySession = typeof studySessions.$inferInsert;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;

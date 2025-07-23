@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin, isStudent } from "./auth";
 import { openaiService } from "./services/openai";
 import { nlpService } from "./services/nlp";
 import { ocrService } from "./services/ocr";
