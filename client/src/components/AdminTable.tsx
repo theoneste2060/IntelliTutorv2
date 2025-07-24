@@ -66,6 +66,7 @@ export default function AdminTable({
   onVerifyQuestion, 
   onEditQuestion, 
   onDeleteQuestion, 
+  onViewQuestion,
   onPageChange,
   onPageSizeChange,
   onSearchChange,

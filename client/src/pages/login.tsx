@@ -103,14 +103,7 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              <strong>Students:</strong> Use Google Sign-in to access your personalized learning dashboard
-            </p>
-            <p className="text-sm text-blue-800 dark:text-blue-200 mt-2">
-              <strong>Administrators:</strong> Use your credentials to manage questions and monitor progress
-            </p>
-          </div>
+
         </div>
 
         {/* Right side - Login Forms */}

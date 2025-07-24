@@ -63,7 +63,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/questions/next', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { subject } = req.query;
+      const { subject, difficulty, level, topic } = req.query;
+      
+      // If filters are provided, use filtered questions
+      if (subject || difficulty || level || topic) {
+        const filteredQuestions = await storage.getFilteredQuestions({
+          subject: subject as string,
+          difficulty: difficulty as string,
+          level: level as string,
+          topic: topic as string,
+          limit: 1
+        });
+        
+        if (filteredQuestions.length > 0) {
+          res.json(filteredQuestions[0]);
+          return;
+        }
+      }
       
       // Get personalized recommendations first
       const recommendations = await storage.getQuestionRecommendations(userId, 1);
@@ -78,6 +94,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching next question:", error);
       res.status(500).json({ message: "Failed to fetch next question" });
+    }
+  });
+
+  app.get('/api/questions/filters', isAuthenticated, async (req: any, res) => {
+    try {
+      const filters = await storage.getAvailableFilters();
+      res.json(filters);
+    } catch (error) {
+      console.error("Error fetching available filters:", error);
+      res.status(500).json({ message: "Failed to fetch available filters" });
     }
   });
 

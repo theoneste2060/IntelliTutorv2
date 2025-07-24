@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { queryClient } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   DropdownMenu, 
@@ -30,8 +31,19 @@ export default function Navigation() {
     document.documentElement.classList.toggle('dark');
   };
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      // Clear all cached queries
+      queryClient.clear();
+      
+      // Call logout endpoint and redirect
+      window.location.href = "/api/logout";
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Fallback - clear cache and redirect anyway
+      queryClient.clear();
+      window.location.href = "/";
+    }
   };
 
   const navItems = [

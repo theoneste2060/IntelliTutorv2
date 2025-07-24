@@ -7,10 +7,11 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
 import QuestionInterface from "@/components/QuestionInterface";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Clock, CheckCircle, RotateCcw, ArrowRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Brain, Clock, CheckCircle, RotateCcw, ArrowRight, Filter, Shuffle } from "lucide-react";
 
 interface Question {
   id: number;
@@ -18,6 +19,7 @@ interface Question {
   subject: string;
   topic?: string;
   difficulty: string;
+  level?: string;
 }
 
 interface EvaluationResult {
@@ -32,6 +34,13 @@ interface EvaluationResult {
   improvements: string[];
 }
 
+interface AvailableFilters {
+  subjects: string[];
+  difficulties: string[];
+  levels: string[];
+  topics: string[];
+}
+
 export default function Practice() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
@@ -40,6 +49,13 @@ export default function Practice() {
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [timeSpent, setTimeSpent] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  
+  // Filter states
+  const [selectedSubject, setSelectedSubject] = useState("all");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("all");
+  const [selectedLevel, setSelectedLevel] = useState("all");
+  const [selectedTopic, setSelectedTopic] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -66,18 +82,39 @@ export default function Practice() {
     }
   }, [startTime]);
 
-  const { data: question, isLoading: questionLoading, refetch: refetchQuestion } = useQuery({
-    queryKey: ["/api/questions/next"],
+  // Query for available filters
+  const { data: availableFilters } = useQuery<AvailableFilters>({
+    queryKey: ["/api/questions/filters"],
     retry: false,
     enabled: isAuthenticated,
-    onSuccess: () => {
+  });
+
+  const { data: question, isLoading: questionLoading, refetch: refetchQuestion } = useQuery({
+    queryKey: ["/api/questions/next", selectedSubject, selectedDifficulty, selectedLevel, selectedTopic],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedSubject !== 'all') params.append('subject', selectedSubject);
+      if (selectedDifficulty !== 'all') params.append('difficulty', selectedDifficulty);
+      if (selectedLevel !== 'all') params.append('level', selectedLevel);
+      if (selectedTopic !== 'all') params.append('topic', selectedTopic);
+      
+      const response = await apiRequest("GET", `/api/questions/next${params.toString() ? `?${params.toString()}` : ''}`);
+      return response.json();
+    },
+    retry: false,
+    enabled: isAuthenticated,
+  });
+
+  // Handle question change side effects
+  useEffect(() => {
+    if (question) {
       setStartTime(new Date());
       setShowFeedback(false);
       setEvaluation(null);
       setCurrentAnswer("");
       setTimeSpent(0);
     }
-  });
+  }, [question]);
 
   const submitAnswerMutation = useMutation({
     mutationFn: async ({ questionId, answerText, timeSpent }: { questionId: number; answerText: string; timeSpent: number }) => {
@@ -163,6 +200,131 @@ export default function Practice() {
       <Navigation />
       
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Question Filters Section */}
+        <Card className="mb-8">
+          <CardHeader className="pb-4">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-xl font-semibold flex items-center">
+                <Filter className="mr-2 w-5 h-5" />
+                Question Preferences
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                {showFilters ? "Hide Filters" : "Show Filters"}
+              </Button>
+            </div>
+          </CardHeader>
+          
+          {showFilters && (
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                {/* Subject Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Subject</label>
+                  <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any Subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any Subject</SelectItem>
+                      {availableFilters?.subjects.map((subject) => (
+                        <SelectItem key={subject} value={subject}>
+                          {subject}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Difficulty Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Difficulty</label>
+                  <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any Difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any Difficulty</SelectItem>
+                      {availableFilters?.difficulties.map((difficulty) => (
+                        <SelectItem key={difficulty} value={difficulty}>
+                          {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Level Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Level</label>
+                  <Select value={selectedLevel} onValueChange={setSelectedLevel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any Level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any Level</SelectItem>
+                      {availableFilters?.levels.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Topic Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Topic</label>
+                  <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any Topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any Topic</SelectItem>
+                      {availableFilters?.topics.map((topic) => (
+                        <SelectItem key={topic} value={topic}>
+                          {topic}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Filters help you practice specific topics and difficulty levels
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedSubject("all");
+                      setSelectedDifficulty("all");
+                      setSelectedLevel("all");
+                      setSelectedTopic("all");
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchQuestion()}
+                  >
+                    <Shuffle className="mr-2 w-4 h-4" />
+                    New Question
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
         <section className="mb-12">
           {questionLoading ? (
             <Card className="question-container">
@@ -186,7 +348,25 @@ export default function Practice() {
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-2xl font-bold">{question.subject} - Question</h3>
-                    <p className="opacity-90">NESA Past Exam • {question.difficulty} Level</p>
+                    <div className="flex items-center space-x-2 opacity-90">
+                      <span>NESA Past Exam</span>
+                      <span>•</span>
+                      <span>{question.difficulty?.charAt(0).toUpperCase() + question.difficulty?.slice(1)} Level</span>
+                      {question.level && (
+                        <>
+                          <span>•</span>
+                          <span>{question.level}</span>
+                        </>
+                      )}
+                      {question.topic && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-xs">
+                            {question.topic}
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm opacity-90">Time</p>

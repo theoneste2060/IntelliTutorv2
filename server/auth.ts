@@ -124,7 +124,32 @@ export function setupAuth(app: Express) {
       if (err) {
         return res.status(500).json({ error: "Logout failed" });
       }
-      res.json({ success: true });
+      // Clear session and redirect
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) {
+          console.error("Session destruction error:", sessionErr);
+        }
+        res.clearCookie('connect.sid');
+        res.json({ success: true, redirect: "/" });
+      });
+    });
+  });
+
+  // Add GET logout route for consistency
+  app.get("/api/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.redirect("/");
+      }
+      // Clear session and redirect
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) {
+          console.error("Session destruction error:", sessionErr);
+        }
+        res.clearCookie('connect.sid');
+        res.redirect("/");
+      });
     });
   });
 

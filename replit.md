@@ -110,3 +110,16 @@ Preferred communication style: Simple, everyday language.
 - `ISSUER_URL`: OpenID Connect provider URL
 
 The application follows a monorepo structure with shared types and schemas, enabling full-stack type safety and efficient development workflows.
+
+## Recent Changes
+
+**January 24, 2025:**
+- Fixed duplicate function declaration error in AdminTable component (onViewQuestion)
+- Added comprehensive question filtering system to practice page
+- Implemented filter interface with Subject, Difficulty, Level, and Topic selection
+- Created new API endpoints: `/api/questions/filters` and enhanced `/api/questions/next` with filter support
+- Added storage methods: `getFilteredQuestions()` and `getAvailableFilters()`
+- Enhanced question display to show level and topic information with badges
+- Fixed TanStack Query v5 compatibility issues (removed deprecated onSuccess callbacks)
+- Added collapsible filter interface with "Show/Hide Filters" toggle
+- Implemented "Clear All" and "New Question" buttons for better user experience

@@ -10,10 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Lightbulb, MessageCircleQuestion, Trophy, Medal, Clock } from "lucide-react";
 import { Link } from "wouter";
+import type { StudentStats, AdminStats, UserBadgeWithDetails } from "@shared/types";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -30,12 +31,12 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<StudentStats | AdminStats>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });
 
-  const { data: badges, isLoading: badgesLoading } = useQuery({
+  const { data: badges, isLoading: badgesLoading } = useQuery<UserBadgeWithDetails[]>({
     queryKey: ["/api/dashboard/badges"],
     retry: false,
   });
@@ -56,48 +57,87 @@ export default function Dashboard() {
         {/* Welcome Section */}
         <section className="mb-12">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-bold text-foreground">Welcome Back, Student!</h2>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground">Current Level:</span>
-              <Badge className="bg-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium">
-                {stats?.currentLevel || 'Beginner'}
-              </Badge>
-            </div>
+            <h2 className="text-3xl font-bold text-foreground">
+              Welcome Back, {user?.role === 'admin' ? 'Admin' : 'Student'}!
+            </h2>
+            {user?.role !== 'admin' && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">Current Level:</span>
+                <Badge className="bg-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium">
+                  {(stats as StudentStats)?.currentLevel || 'Beginner'}
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatsCard
-              icon={MessageCircleQuestion}
-              iconColor="text-primary"
-              iconBg="bg-blue-100 dark:bg-blue-900"
-              title="Questions Completed"
-              value={statsLoading ? "..." : stats?.questionsCompleted?.toString() || "0"}
-            />
-            
-            <StatsCard
-              icon={Trophy}
-              iconColor="text-secondary"
-              iconBg="bg-green-100 dark:bg-green-900"
-              title="Average Score"
-              value={statsLoading ? "..." : `${stats?.averageScore || 0}%`}
-            />
-            
-            <StatsCard
-              icon={Medal}
-              iconColor="text-accent"
-              iconBg="bg-orange-100 dark:bg-orange-900"
-              title="Badges Earned"
-              value={statsLoading ? "..." : stats?.badges?.toString() || "0"}
-            />
-            
-            <StatsCard
-              icon={Clock}
-              iconColor="text-purple-600"
-              iconBg="bg-purple-100 dark:bg-purple-900"
-              title="Study Streak"
-              value={statsLoading ? "..." : `${stats?.studyStreak || 0} days`}
-            />
+            {user?.role === 'admin' ? (
+              <>
+                <StatsCard
+                  icon={MessageCircleQuestion}
+                  iconColor="text-primary"
+                  iconBg="bg-blue-100 dark:bg-blue-900"
+                  title="Total Questions"
+                  value={statsLoading ? "..." : (stats as AdminStats)?.totalQuestions?.toString() || "0"}
+                />
+                <StatsCard
+                  icon={Trophy}
+                  iconColor="text-green-600"
+                  iconBg="bg-green-100 dark:bg-green-900"
+                  title="Total Students"
+                  value={statsLoading ? "..." : (stats as AdminStats)?.totalStudents?.toString() || "0"}
+                />
+                <StatsCard
+                  icon={Clock}
+                  iconColor="text-orange-600"
+                  iconBg="bg-orange-100 dark:bg-orange-900"
+                  title="Pending Reviews"
+                  value={statsLoading ? "..." : (stats as AdminStats)?.pendingReviews?.toString() || "0"}
+                />
+                <StatsCard
+                  icon={Medal}
+                  iconColor="text-purple-600"
+                  iconBg="bg-purple-100 dark:bg-purple-900"
+                  title="AI Accuracy"
+                  value={statsLoading ? "..." : `${(stats as AdminStats)?.aiAccuracy || 0}%`}
+                />
+              </>
+            ) : (
+              <>
+                <StatsCard
+                  icon={MessageCircleQuestion}
+                  iconColor="text-primary"
+                  iconBg="bg-blue-100 dark:bg-blue-900"
+                  title="Questions Completed"
+                  value={statsLoading ? "..." : (stats as StudentStats)?.questionsCompleted?.toString() || "0"}
+                />
+                
+                <StatsCard
+                  icon={Trophy}
+                  iconColor="text-secondary"
+                  iconBg="bg-green-100 dark:bg-green-900"
+                  title="Average Score"
+                  value={statsLoading ? "..." : `${(stats as StudentStats)?.averageScore || 0}%`}
+                />
+                
+                <StatsCard
+                  icon={Medal}
+                  iconColor="text-accent"
+                  iconBg="bg-orange-100 dark:bg-orange-900"
+                  title="Badges Earned"
+                  value={statsLoading ? "..." : (stats as StudentStats)?.badges?.toString() || "0"}
+                />
+                
+                <StatsCard
+                  icon={Clock}
+                  iconColor="text-purple-600"
+                  iconBg="bg-purple-100 dark:bg-purple-900"
+                  title="Study Streak"
+                  value={statsLoading ? "..." : `${(stats as StudentStats)?.studyStreak || 0} days`}
+                />
+              </>
+            )}
           </div>
 
           {/* Quick Actions & Recent Badges */}
@@ -136,8 +176,8 @@ export default function Dashboard() {
                     <div className="flex items-center justify-center h-24">
                       <div className="spinner"></div>
                     </div>
-                  ) : badges?.length > 0 ? (
-                    badges.slice(0, 2).map((badge: any, index: number) => (
+                  ) : badges && badges.length > 0 ? (
+                    badges.slice(0, 2).map((badge, index: number) => (
                       <div key={index} className="flex items-center p-2 bg-muted/50 dark:bg-muted/20 rounded-lg">
                         <div className={`badge-container badge-gradient-${(index % 3) + 1}`}>
                           <Medal className="w-5 h-5" />

@@ -46,6 +46,19 @@ export interface IStorage {
   updateQuestion(id: number, updates: Partial<Question>): Promise<void>;
   deleteQuestion(id: number): Promise<void>;
   getQuestionsBySubject(subject: string, limit?: number): Promise<Question[]>;
+  getFilteredQuestions(filters: {
+    subject?: string;
+    difficulty?: string;
+    level?: string;
+    topic?: string;
+    limit?: number;
+  }): Promise<Question[]>;
+  getAvailableFilters(): Promise<{
+    subjects: string[];
+    difficulties: string[];
+    levels: string[];
+    topics: string[];
+  }>;
   
   // Student Answer operations
   createStudentAnswer(answer: InsertStudentAnswer): Promise<StudentAnswer>;
@@ -226,6 +239,88 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  async getFilteredQuestions(filters: {
+    subject?: string;
+    difficulty?: string;
+    level?: string;
+    topic?: string;
+    limit?: number;
+  }): Promise<Question[]> {
+    const { subject, difficulty, level, topic, limit = 1 } = filters;
+    
+    const conditions = [eq(questions.isVerified, true)];
+    
+    if (subject && subject !== 'all') {
+      conditions.push(eq(questions.subject, subject));
+    }
+    
+    if (difficulty && difficulty !== 'all') {
+      conditions.push(eq(questions.difficulty, difficulty));
+    }
+    
+    if (level && level !== 'all') {
+      conditions.push(eq(examPapers.level, level));
+    }
+    
+    if (topic && topic !== 'all') {
+      conditions.push(eq(questions.topic, topic));
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+    
+    return await db.select({
+      id: questions.id,
+      examPaperId: questions.examPaperId,
+      questionNumber: questions.questionNumber,
+      questionText: questions.questionText,
+      subject: questions.subject,
+      topic: questions.topic,
+      difficulty: questions.difficulty,
+      learningOutcome: questions.learningOutcome,
+      aiModelAnswer: questions.aiModelAnswer,
+      aiConfidence: questions.aiConfidence,
+      isVerified: questions.isVerified,
+      verifiedBy: questions.verifiedBy,
+      createdAt: questions.createdAt
+    })
+    .from(questions)
+    .innerJoin(examPapers, eq(questions.examPaperId, examPapers.id))
+    .where(whereClause)
+    .orderBy(sql`RANDOM()`)
+    .limit(limit);
+  }
+
+  async getAvailableFilters(): Promise<{
+    subjects: string[];
+    difficulties: string[];
+    levels: string[];
+    topics: string[];
+  }> {
+    const subjectsResult = await db.selectDistinct({ subject: questions.subject })
+      .from(questions)
+      .where(eq(questions.isVerified, true));
+    
+    const difficultiesResult = await db.selectDistinct({ difficulty: questions.difficulty })
+      .from(questions)
+      .where(eq(questions.isVerified, true));
+    
+    const levelsResult = await db.selectDistinct({ level: examPapers.level })
+      .from(examPapers)
+      .innerJoin(questions, eq(questions.examPaperId, examPapers.id))
+      .where(eq(questions.isVerified, true));
+    
+    const topicsResult = await db.selectDistinct({ topic: questions.topic })
+      .from(questions)
+      .where(and(eq(questions.isVerified, true), sql`${questions.topic} IS NOT NULL`));
+
+    return {
+      subjects: subjectsResult.map(r => r.subject).filter(Boolean) as string[],
+      difficulties: difficultiesResult.map(r => r.difficulty).filter(Boolean) as string[],
+      levels: levelsResult.map(r => r.level).filter(Boolean) as string[],
+      topics: topicsResult.map(r => r.topic).filter(Boolean) as string[]
+    };
+  }
+
   // Student Answer operations
   async createStudentAnswer(answer: InsertStudentAnswer): Promise<StudentAnswer> {
     const [studentAnswer] = await db.insert(studentAnswers).values(answer).returning();
@@ -304,7 +399,7 @@ export class DatabaseStorage implements IStorage {
     // Get subject-specific recommendations by analyzing question subjects
     const subjectScores = new Map();
     for (const answer of last10Answers) {
-      const question = await this.getQuestion(answer.questionId);
+      const question = await this.getQuestion(answer.questionId!);
       if (question) {
         const subject = question.subject;
         if (!subjectScores.has(subject)) {
@@ -373,7 +468,7 @@ export class DatabaseStorage implements IStorage {
     const subjectStats = new Map();
 
     for (const answer of answers) {
-      const question = await this.getQuestion(answer.questionId);
+      const question = await this.getQuestion(answer.questionId!);
       if (question) {
         const subject = question.subject;
         if (!subjectStats.has(subject)) {

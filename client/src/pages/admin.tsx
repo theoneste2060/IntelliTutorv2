@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Settings, MessageCircleQuestion, Users, Brain, Clock, FileText, CheckCircle } from "lucide-react";
+import type { AdminStats, QuestionsResponse } from "@shared/types";
 
 export default function Admin() {
   const { toast } = useToast();
@@ -38,6 +39,11 @@ export default function Admin() {
     file: null as File | null
   });
 
+  const handleViewQuestion = (question: any) => {
+    setViewingQuestion(question);
+    setViewDialogOpen(true);
+  };
+
   // Redirect to home if not authenticated or not admin
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || user?.role !== 'admin')) {
@@ -53,13 +59,13 @@ export default function Admin() {
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
-  const { data: questionsData, isLoading: questionsLoading, refetch: refetchQuestions } = useQuery({
+  const { data: questionsData, isLoading: questionsLoading, refetch: refetchQuestions } = useQuery<QuestionsResponse>({
     queryKey: ["/api/admin/questions", currentPage, pageSize, searchTerm, subjectFilter, verificationFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -209,11 +215,6 @@ export default function Admin() {
   const handleEditQuestion = (questionId: number, question: any) => {
     setEditingQuestion(question);
     setEditDialogOpen(true);
-  };
-
-  const handleViewQuestion = (question: any) => {
-    setViewingQuestion(question);
-    setViewDialogOpen(true);
   };
 
   const handleSaveQuestion = (questionId: number, updates: any) => {
