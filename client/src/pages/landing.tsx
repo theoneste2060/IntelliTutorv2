@@ -1,11 +1,25 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, BookOpen, Trophy, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import heroImage1 from "@assets/WEB_1_1753337276541.jpg";
+import heroImage2 from "@assets/WEB_6_1753337276543.jpg";
 
 export default function Landing() {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const heroImages = [heroImage1, heroImage2];
+
   const handleLogin = () => {
     window.location.href = "/api/login";
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % heroImages.length);
+    }, 5000); // Change image every 5 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -27,28 +41,58 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-20 overflow-hidden min-h-[80vh] flex items-center">
+        {/* Background Images Carousel */}
+        <div className="absolute inset-0">
+          {heroImages.map((image, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 ${
+                index === currentImageIndex ? 'opacity-60' : 'opacity-0'
+              }`}
+              style={{ backgroundImage: `url(${image})` }}
+            />
+          ))}
+          {/* Dark overlay for better text readability */}
+          <div className="absolute inset-0 bg-black/50" />
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/60 via-transparent to-accent/40" />
+        </div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-2xl leading-tight">
               Master NESA Exams with
-              <span className="text-primary"> AI-Powered</span> Practice
+              <span className="text-yellow-300 drop-shadow-lg"> AI-Powered</span> Practice
             </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+            <p className="text-xl text-white/95 mb-8 max-w-3xl mx-auto drop-shadow-xl font-medium leading-relaxed bg-black/20 backdrop-blur-sm rounded-lg p-6">
               IntelliTutor uses advanced AI to extract questions from past exam papers, 
               provide intelligent evaluation, and give personalized feedback to accelerate your learning.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleLogin} size="lg" className="btn-primary">
-                <Brain className="mr-2 h-5 w-5" />
+              <Button onClick={handleLogin} size="lg" className="bg-white text-primary hover:bg-gray-100 shadow-2xl border-0 font-semibold text-lg px-8 py-4">
+                <Brain className="mr-2 h-6 w-6" />
                 Start Learning Now
               </Button>
-              <Button variant="outline" size="lg" className="btn-outline">
-                <BookOpen className="mr-2 h-5 w-5" />
+              <Button variant="outline" size="lg" className="bg-white/10 border-2 border-white text-white hover:bg-white hover:text-primary shadow-2xl font-semibold text-lg px-8 py-4 backdrop-blur-md">
+                <BookOpen className="mr-2 h-6 w-6" />
                 Explore Features
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Slide indicators */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
+          {heroImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentImageIndex(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                index === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/75'
+              }`}
+            />
+          ))}
         </div>
       </section>
 

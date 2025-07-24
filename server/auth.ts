@@ -24,20 +24,25 @@ export function setupAuth(app: Express) {
 
   // Google OAuth Strategy for students
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    console.log("Setting up Google OAuth with callback URL:", `https://${process.env.REPLIT_DOMAINS}/api/auth/google/callback`);
     passport.use(
       new GoogleStrategy(
         {
           clientID: process.env.GOOGLE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          callbackURL: "/api/auth/google/callback",
+          callbackURL: `https://${process.env.REPLIT_DOMAINS}/api/auth/google/callback`,
         },
         async (accessToken, refreshToken, profile, done) => {
           try {
+            console.log("Google OAuth callback - Profile:", profile.displayName, profile.emails?.[0]?.value);
+            
             // Check if user already exists
             let user = await storage.getUserByEmail(profile.emails?.[0]?.value || "");
+            console.log("Existing user found:", !!user);
             
             if (!user) {
               // Create new user
+              console.log("Creating new user for Google OAuth");
               user = await storage.createUser({
                 id: profile.id,
                 email: profile.emails?.[0]?.value || "",
@@ -46,10 +51,13 @@ export function setupAuth(app: Express) {
                 profileImageUrl: profile.photos?.[0]?.value || "",
                 role: "student",
               });
+              console.log("New user created:", user.id);
             }
             
+            console.log("OAuth success, returning user:", user.id, user.role);
             return done(null, user);
           } catch (error) {
+            console.error("Google OAuth error:", error);
             return done(error, undefined);
           }
         }
@@ -113,6 +121,33 @@ export function setupAuth(app: Express) {
   // Auth routes
   app.get("/api/login", (req, res) => {
     res.redirect("/login");
+  });
+
+  // Google OAuth routes for students
+  app.get("/api/auth/google", 
+    passport.authenticate("google", { scope: ["profile", "email"] })
+  );
+
+  app.get("/api/auth/google/callback", 
+    (req, res, next) => {
+      console.log("OAuth callback received with query:", req.query);
+      passport.authenticate("google", { 
+        failureRedirect: "/login",
+        failureMessage: true 
+      })(req, res, next);
+    },
+    (req, res) => {
+      // Successful authentication, redirect to dashboard
+      console.log("OAuth callback success, user:", req.user);
+      console.log("Session ID:", req.sessionID);
+      res.redirect("/dashboard");
+    }
+  );
+
+  // Add error handling for OAuth failures
+  app.get("/api/auth/google/error", (req, res) => {
+    console.log("OAuth error callback hit");
+    res.redirect("/login?error=oauth_failed");
   });
 
   app.post("/api/auth/admin/login", passport.authenticate("local"), (req, res) => {

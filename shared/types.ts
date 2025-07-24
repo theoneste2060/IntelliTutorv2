@@ -6,6 +6,26 @@ export interface AdminStats {
   aiAccuracy: number;
 }
 
+export interface StudentPerformance {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  currentLevel: string;
+  totalScore: number;
+  questionsCompleted: number;
+  studyStreak: number;
+  lastActiveDate?: number;
+  averageScore: number;
+  timeSpent: number; // total time in minutes
+  strongSubjects: string[];
+  weakSubjects: string[];
+  badgeCount: number;
+  createdAt: number;
+  lastLogin: number;
+}
+
 export interface StudentStats {
   questionsCompleted: number;
   averageScore: number;

@@ -186,6 +186,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Student Management endpoints
+  app.get('/api/admin/students', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const students = await storage.getAllStudentsPerformance();
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  app.get('/api/admin/students/export', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const students = await storage.getAllStudentsPerformance();
+      
+      // Generate CSV content
+      const csvHeaders = [
+        'Student ID',
+        'Email', 
+        'First Name',
+        'Last Name',
+        'Current Level',
+        'Questions Completed',
+        'Average Score (%)',
+        'Total Score',
+        'Study Streak',
+        'Time Spent (minutes)',
+        'Badge Count',
+        'Strong Subjects',
+        'Weak Subjects',
+        'Registration Date',
+        'Last Login'
+      ];
+
+      const csvRows = students.map(student => [
+        student.id,
+        student.email,
+        student.firstName,
+        student.lastName,
+        student.currentLevel,
+        student.questionsCompleted,
+        student.averageScore,
+        student.totalScore,
+        student.studyStreak,
+        student.timeSpent,
+        student.badgeCount,
+        student.strongSubjects.join('; '),
+        student.weakSubjects.join('; '),
+        new Date(student.createdAt).toISOString().split('T')[0],
+        new Date(student.lastLogin).toISOString().split('T')[0]
+      ]);
+
+      const csvContent = [csvHeaders, ...csvRows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="students_performance_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Error exporting students:", error);
+      res.status(500).json({ message: "Failed to export students data" });
+    }
+  });
+
   // Admin endpoints
   app.post('/api/admin/upload-paper', isAuthenticated, upload.single('examPaper'), async (req: any, res) => {
     try {

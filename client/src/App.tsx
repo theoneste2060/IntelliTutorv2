@@ -10,6 +10,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Practice from "@/pages/practice";
 import Admin from "@/pages/admin";
+import AdminStudents from "@/pages/admin-students";
 import Progress from "@/pages/progress";
 
 function Router() {
@@ -23,8 +24,10 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/dashboard" component={Dashboard} />
           <Route path="/practice" component={Practice} />
           <Route path="/admin" component={Admin} />
+          <Route path="/admin/students" component={AdminStudents} />
           <Route path="/progress" component={Progress} />
         </>
       )}

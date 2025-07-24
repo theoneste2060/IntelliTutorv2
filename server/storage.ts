@@ -88,6 +88,11 @@ export interface IStorage {
   // Analytics
   getAdminStats(): Promise<any>;
   getStudentStats(studentId: string): Promise<any>;
+  
+  // Student Management
+  getAllStudents(): Promise<any[]>;
+  getStudentPerformanceData(studentId: string): Promise<any>;
+  getAllStudentsPerformance(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -663,6 +668,71 @@ export class DatabaseStorage implements IStorage {
       studyStreak: progress.studyStreak,
       currentLevel: user?.currentLevel || 'Beginner',
     };
+  }
+
+  // Student Management operations
+  async getAllStudents(): Promise<any[]> {
+    return await db.select()
+      .from(users)
+      .where(eq(users.role, 'student'))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getStudentPerformanceData(studentId: string): Promise<any> {
+    const user = await this.getUser(studentId);
+    if (!user) return null;
+
+    // Get student answers with performance metrics
+    const answers = await db.select().from(studentAnswers)
+      .where(eq(studentAnswers.studentId, studentId));
+
+    // Calculate performance metrics
+    const totalTimeSpent = answers.reduce((sum, answer) => sum + (answer.timeSpent || 0), 0);
+    const averageScore = answers.length > 0 
+      ? answers.reduce((sum, answer) => sum + answer.score, 0) / answers.length 
+      : 0;
+
+    // Get badge count
+    const userBadgeCount = await db.select({ count: count() })
+      .from(userBadges)
+      .where(eq(userBadges.userId, studentId));
+
+    // Get subject performance
+    const subjectScores = await db.select({
+      subject: questions.subject,
+      avgScore: avg(studentAnswers.score),
+      count: count()
+    })
+      .from(studentAnswers)
+      .innerJoin(questions, eq(studentAnswers.questionId, questions.id))
+      .where(eq(studentAnswers.studentId, studentId))
+      .groupBy(questions.subject);
+
+    const strongSubjects = subjectScores
+      .filter(s => s.avgScore && Number(s.avgScore) >= 80)
+      .map(s => s.subject);
+    
+    const weakSubjects = subjectScores
+      .filter(s => s.avgScore && Number(s.avgScore) < 60)
+      .map(s => s.subject);
+
+    return {
+      ...user,
+      averageScore: Math.round(averageScore),
+      timeSpent: Math.round(totalTimeSpent / 60), // Convert to minutes
+      strongSubjects,
+      weakSubjects,
+      badgeCount: userBadgeCount[0]?.count || 0,
+      lastLogin: user.lastActiveDate || user.createdAt,
+    };
+  }
+
+  async getAllStudentsPerformance(): Promise<any[]> {
+    const students = await this.getAllStudents();
+    const performanceData = await Promise.all(
+      students.map(student => this.getStudentPerformanceData(student.id))
+    );
+    return performanceData.filter(data => data !== null);
   }
 }
 
