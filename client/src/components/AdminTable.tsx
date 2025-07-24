@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Edit, Check, Trash2, Search } from "lucide-react";
+import { Edit, Check, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Question {
   id: number;
@@ -28,6 +28,7 @@ interface Question {
   difficulty: string;
   isVerified: boolean;
   aiConfidence: number;
+  aiModelAnswer?: string;
   examPaperId?: number;
   questionNumber?: number;
   createdAt?: string;
@@ -36,10 +37,24 @@ interface Question {
 interface AdminTableProps {
   questions: Question[];
   loading: boolean;
+  total: number;
+  page: number;
   onVerifyQuestion: (questionId: number, isVerified: boolean) => void;
+  onEditQuestion: (questionId: number, updates: Partial<Question>) => void;
+  onDeleteQuestion: (questionId: number) => void;
+  onPageChange: (page: number) => void;
 }
 
-export default function AdminTable({ questions, loading, onVerifyQuestion }: AdminTableProps) {
+export default function AdminTable({ 
+  questions, 
+  loading, 
+  total, 
+  page, 
+  onVerifyQuestion, 
+  onEditQuestion, 
+  onDeleteQuestion, 
+  onPageChange 
+}: AdminTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [verificationFilter, setVerificationFilter] = useState("all");
@@ -61,7 +76,7 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
   });
 
   // Get unique subjects for filter dropdown
-  const subjects = [...new Set(questions.map(q => q.subject))];
+  const subjects = Array.from(new Set(questions.map(q => q.subject)));
 
   const getStatusBadge = (isVerified: boolean, confidence: number) => {
     if (isVerified) {
@@ -172,6 +187,9 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
                     Confidence
                   </TableHead>
                   <TableHead className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Model Answer
+                  </TableHead>
+                  <TableHead className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -179,7 +197,7 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
               <TableBody className="bg-card divide-y divide-border">
                 {filteredQuestions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                       {searchTerm || subjectFilter !== "all" || verificationFilter !== "all"
                         ? "No questions match your filters"
                         : "No questions available"}
@@ -215,10 +233,18 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
                       <TableCell className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {Math.round((question.aiConfidence || 0) * 100)}%
                       </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <div className="max-w-xs">
+                          <p className="text-sm text-muted-foreground">
+                            {question.aiModelAnswer ? truncateText(question.aiModelAnswer, 80) : "Not generated"}
+                          </p>
+                        </div>
+                      </TableCell>
                       <TableCell className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => onEditQuestion(question.id, question)}
                           className="text-primary hover:text-blue-700 hover:bg-primary/10"
                         >
                           <Edit className="w-4 h-4" />
@@ -238,6 +264,7 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => onDeleteQuestion(question.id)}
                           className="text-destructive hover:text-red-700 hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -250,6 +277,36 @@ export default function AdminTable({ questions, loading, onVerifyQuestion }: Adm
             </Table>
           </div>
         )}
+        
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+          <div className="text-sm text-muted-foreground">
+            Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, total)} of {total} questions
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {Math.ceil(total / 20)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= Math.ceil(total / 20)}
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

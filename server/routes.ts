@@ -23,9 +23,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -35,10 +33,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoints
   app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const userId = req.user.id;
       
-      if (user?.role === 'admin') {
+      if (req.user.role === 'admin') {
         const stats = await storage.getAdminStats();
         res.json(stats);
       } else {
@@ -53,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/dashboard/badges', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const badges = await storage.getUserBadges(userId);
       res.json(badges);
     } catch (error) {
@@ -65,18 +62,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Question practice endpoints
   app.get('/api/questions/next', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { subject } = req.query;
       
       // Get personalized recommendations first
       const recommendations = await storage.getQuestionRecommendations(userId, 1);
       
       if (recommendations.length > 0) {
-        const question = await storage.getQuestion(recommendations[0].questionId!);
-        res.json(question);
+        res.json(recommendations[0]);
       } else {
         // Fallback to subject-based questions
-        const questions = await storage.getQuestionsBySubject(subject as string || 'Computer Science', 1);
+        const questions = await storage.getQuestionsBySubject(subject as string || 'Mathematics', 1);
         res.json(questions[0] || null);
       }
     } catch (error) {
@@ -87,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/questions/:id/answer', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const questionId = parseInt(req.params.id);
       const { answerText, timeSpent } = req.body;
 
@@ -127,22 +123,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         answerText,
         score: finalScore,
         feedback: combinedFeedback,
-        evaluationDetails: {
+        evaluationDetails: JSON.stringify({
           nlp: nlpEvaluation,
           ai: aiEvaluation,
-        },
+        }),
         timeSpent,
         isCorrect: finalScore >= 70,
       });
 
-      // Update user stats
-      const user = await storage.getUser(userId);
-      if (user) {
-        await storage.upsertUser({
-          ...user,
-          questionsCompleted: (user.questionsCompleted || 0) + 1,
-          totalScore: (user.totalScore || 0) + finalScore,
-        });
+      // Update user stats for students only
+      if (req.user.role === 'student') {
+        const user = await storage.getUser(userId);
+        if (user) {
+          await storage.upsertUser({
+            ...user,
+            questionsCompleted: (user.questionsCompleted || 0) + 1,
+            totalScore: (user.totalScore || 0) + finalScore,
+          });
+        }
       }
 
       res.json({
@@ -165,12 +163,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoints
   app.post('/api/admin/upload-paper', isAuthenticated, upload.single('examPaper'), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (user?.role !== 'admin') {
+      if (req.user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
+      
+      const userId = req.user.id;
 
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -203,33 +200,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error uploading exam paper:", error);
-      res.status(500).json({ message: error.message || "Failed to upload exam paper" });
+      res.status(500).json({ message: (error as Error).message || "Failed to upload exam paper" });
     }
   });
 
   app.get('/api/admin/questions', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (user?.role !== 'admin') {
+      if (req.user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const { subject, verified } = req.query;
-      let questions = await storage.getQuestions();
-
-      // Filter by subject if provided
-      if (subject && subject !== 'all') {
-        questions = questions.filter(q => q.subject === subject);
-      }
-
-      // Filter by verification status if provided
-      if (verified !== undefined) {
-        questions = questions.filter(q => q.isVerified === (verified === 'true'));
-      }
-
-      res.json(questions);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const result = await storage.getAllQuestions(page, limit);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching admin questions:", error);
       res.status(500).json({ message: "Failed to fetch questions" });
@@ -238,12 +222,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/questions/:id/verify', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (user?.role !== 'admin') {
+      if (req.user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
+      
+      const userId = req.user.id;
 
       const questionId = parseInt(req.params.id);
       const { isVerified } = req.body;
@@ -257,10 +240,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/questions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const questionId = parseInt(req.params.id);
+      const updates = req.body;
+      await storage.updateQuestion(questionId, updates);
+      res.json({ message: "Question updated successfully" });
+    } catch (error) {
+      console.error("Error updating question:", error);
+      res.status(500).json({ message: "Failed to update question" });
+    }
+  });
+
+  app.delete('/api/admin/questions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const questionId = parseInt(req.params.id);
+      await storage.deleteQuestion(questionId);
+      res.json({ message: "Question deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting question:", error);
+      res.status(500).json({ message: "Failed to delete question" });
+    }
+  });
+
   // Progress and recommendations endpoints
   app.get('/api/progress', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const progress = await storage.getStudentProgress(userId);
       
       // Get recent answers for recommendations

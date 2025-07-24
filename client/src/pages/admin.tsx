@@ -19,6 +19,7 @@ export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     subject: "",
@@ -48,8 +49,12 @@ export default function Admin() {
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
-  const { data: questions, isLoading: questionsLoading, refetch: refetchQuestions } = useQuery({
-    queryKey: ["/api/admin/questions"],
+  const { data: questionsData, isLoading: questionsLoading, refetch: refetchQuestions } = useQuery({
+    queryKey: ["/api/admin/questions", currentPage],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/admin/questions?page=${currentPage}&limit=20`);
+      return response.json();
+    },
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
   });
@@ -138,6 +143,68 @@ export default function Admin() {
       });
     },
   });
+
+  const editQuestionMutation = useMutation({
+    mutationFn: async ({ questionId, updates }: { questionId: number; updates: any }) => {
+      const response = await apiRequest("PUT", `/api/admin/questions/${questionId}`, updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Question updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update question",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (questionId: number) => {
+      const response = await apiRequest("DELETE", `/api/admin/questions/${questionId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success", 
+        description: "Question deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete question",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditQuestion = (questionId: number, updates: any) => {
+    // For now, just show the current values - in a real app you'd show an edit dialog
+    console.log("Edit question:", questionId, updates);
+    toast({
+      title: "Feature Coming Soon",
+      description: "Question editing dialog will be implemented soon",
+    });
+  };
+
+  const handleDeleteQuestion = (questionId: number) => {
+    if (confirm("Are you sure you want to delete this question? This action cannot be undone.")) {
+      deleteQuestionMutation.mutate(questionId);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -423,11 +490,16 @@ export default function Admin() {
 
           {/* Question Management Table */}
           <AdminTable
-            questions={questions || []}
+            questions={questionsData?.questions || []}
             loading={questionsLoading}
+            total={questionsData?.total || 0}
+            page={currentPage}
             onVerifyQuestion={(questionId, isVerified) => 
               verifyQuestionMutation.mutate({ questionId, isVerified })
             }
+            onEditQuestion={handleEditQuestion}
+            onDeleteQuestion={handleDeleteQuestion}
+            onPageChange={handlePageChange}
           />
         </section>
       </div>

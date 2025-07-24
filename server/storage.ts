@@ -22,7 +22,7 @@ import {
 
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, avg } from "drizzle-orm";
+import { eq, desc, and, sql, count, avg, notInArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -40,8 +40,11 @@ export interface IStorage {
   // Question operations
   createQuestion(question: InsertQuestion): Promise<Question>;
   getQuestions(examPaperId?: number): Promise<Question[]>;
+  getAllQuestions(page?: number, limit?: number): Promise<{ questions: Question[]; total: number }>;
   getQuestion(id: number): Promise<Question | undefined>;
   updateQuestionVerification(id: number, isVerified: boolean, verifiedBy: string): Promise<void>;
+  updateQuestion(id: number, updates: Partial<Question>): Promise<void>;
+  deleteQuestion(id: number): Promise<void>;
   getQuestionsBySubject(subject: string, limit?: number): Promise<Question[]>;
   
   // Student Answer operations
@@ -154,6 +157,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(questions.id, id));
   }
 
+  async getAllQuestions(page = 1, limit = 20): Promise<{ questions: Question[]; total: number }> {
+    const offset = (page - 1) * limit;
+    const questionsResult = await db.select().from(questions)
+      .orderBy(desc(questions.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    const [totalResult] = await db.select({ count: count() }).from(questions);
+    
+    return {
+      questions: questionsResult,
+      total: totalResult.count
+    };
+  }
+
+  async deleteQuestion(id: number): Promise<void> {
+    await db.delete(questions).where(eq(questions.id, id));
+  }
+
+  async updateQuestion(id: number, updates: Partial<Question>): Promise<void> {
+    await db.update(questions).set(updates).where(eq(questions.id, id));
+  }
+
   async getQuestionsBySubject(subject: string, limit = 10): Promise<Question[]> {
     return await db.select()
       .from(questions)
@@ -168,11 +194,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudentAnswers(studentId: string, questionId?: number): Promise<StudentAnswer[]> {
-    const query = db.select().from(studentAnswers).where(eq(studentAnswers.studentId, studentId));
     if (questionId) {
-      return await query.where(and(eq(studentAnswers.studentId, studentId), eq(studentAnswers.questionId, questionId)));
+      return await db.select().from(studentAnswers)
+        .where(and(eq(studentAnswers.studentId, studentId), eq(studentAnswers.questionId, questionId)));
     }
-    return await query.orderBy(desc(studentAnswers.createdAt));
+    return await db.select().from(studentAnswers)
+      .where(eq(studentAnswers.studentId, studentId))
+      .orderBy(desc(studentAnswers.createdAt));
   }
 
   async getStudentProgress(studentId: string): Promise<any> {
@@ -232,17 +260,29 @@ export class DatabaseStorage implements IStorage {
     await db.update(studySessions).set(updates).where(eq(studySessions.id, id));
   }
 
-  // Recommendation operations
-  async createQuestionRecommendation(recommendation: Omit<QuestionRecommendation, 'id' | 'createdAt'>): Promise<QuestionRecommendation> {
-    const [rec] = await db.insert(questionRecommendations).values(recommendation).returning();
-    return rec;
-  }
-
-  async getQuestionRecommendations(studentId: string, limit = 5): Promise<QuestionRecommendation[]> {
-    return await db.select()
-      .from(questionRecommendations)
-      .where(and(eq(questionRecommendations.studentId, studentId), eq(questionRecommendations.isUsed, false)))
-      .orderBy(desc(questionRecommendations.recommendationScore))
+  // Recommendation operations - simplified to return questions directly
+  async getQuestionRecommendations(studentId: string, limit = 5): Promise<Question[]> {
+    // Return verified questions that the student hasn't answered yet
+    const answeredQuestions = await db.select({ questionId: studentAnswers.questionId })
+      .from(studentAnswers)
+      .where(eq(studentAnswers.studentId, studentId));
+    
+    const answeredIds = answeredQuestions.map(a => a.questionId);
+    
+    if (answeredIds.length > 0) {
+      const filteredAnsweredIds = answeredIds.filter(id => id !== null) as number[];
+      if (filteredAnsweredIds.length > 0) {
+        return await db.select().from(questions)
+          .where(and(
+            eq(questions.isVerified, true),
+            notInArray(questions.id, filteredAnsweredIds)
+          ))
+          .limit(limit);
+      }
+    }
+    
+    return await db.select().from(questions)
+      .where(eq(questions.isVerified, true))
       .limit(limit);
   }
 

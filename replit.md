@@ -26,10 +26,11 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL storage
 
 ### Authentication System
-- **Provider**: Replit Auth (OpenID Connect)
-- **Session Storage**: PostgreSQL with connect-pg-simple
-- **Strategy**: Passport.js with OpenID Connect strategy
+- **Provider**: Simple credential-based authentication
+- **Session Storage**: Express sessions with memory store
+- **Strategy**: Passport.js with local strategy
 - **Authorization**: Role-based access control (student/admin)
+- **Credentials**: username: admin, password: admin123
 
 ## Key Components
 
@@ -40,8 +41,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Management
 - **ORM**: Drizzle ORM for type-safe database operations
-- **Database**: PostgreSQL (Neon serverless) for production data storage
-- **Migrations**: Drizzle Kit for database schema management
+- **Database**: SQLite for local development and production data storage
+- **Migrations**: Direct SQL table creation in server/db.ts
 - **Validation**: Zod schemas for data validation
 
 ### User Interface Components

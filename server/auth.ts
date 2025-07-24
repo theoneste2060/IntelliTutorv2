@@ -111,15 +111,9 @@ export function setupAuth(app: Express) {
   });
 
   // Auth routes
-  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-
-  app.get(
-    "/api/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res) => {
-      res.redirect("/");
-    }
-  );
+  app.get("/api/login", (req, res) => {
+    res.redirect("/login");
+  });
 
   app.post("/api/auth/admin/login", passport.authenticate("local"), (req, res) => {
     res.json({ success: true, user: req.user });
@@ -134,13 +128,7 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/auth/user", (req, res) => {
-    if (req.isAuthenticated()) {
-      res.json(req.user);
-    } else {
-      res.status(401).json({ message: "Unauthorized" });
-    }
-  });
+  // Remove this route since it's defined in routes.ts
 }
 
 // Middleware to check if user is authenticated
