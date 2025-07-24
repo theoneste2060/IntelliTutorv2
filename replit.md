@@ -17,6 +17,7 @@ Preferred communication style: Simple, everyday language.
 - **UI Framework**: Shadcn/ui components built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS custom properties for theming
 - **Build Tool**: Vite for development and production builds
+- **PWA Features**: Service Worker, Web App Manifest, offline functionality, and app installation capabilities
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
@@ -134,3 +135,10 @@ The application follows a monorepo structure with shared types and schemas, enab
 - **Sliding Hero Images**: Added automatic slideshow with educational classroom images cycling every 5 seconds
 - **Enhanced Text Readability**: Improved hero section text visibility with backdrop blur and dark overlays
 - **Interactive Elements**: Added clickable slide indicators for manual image navigation
+- **Progressive Web App (PWA)**: Converted application to PWA with offline capabilities, app installation, and native-like experience
+  - Web App Manifest with icons, shortcuts, and app metadata
+  - Service Worker for offline functionality and background sync
+  - PWA Install Button in navigation for easy app installation
+  - Update notifications when new versions are available
+  - Offline storage for critical data and caching strategies
+  - Background sync for offline answer submissions

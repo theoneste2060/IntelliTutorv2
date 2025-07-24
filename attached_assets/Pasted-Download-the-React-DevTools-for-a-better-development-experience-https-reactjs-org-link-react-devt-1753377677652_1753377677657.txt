@@ -1,0 +1,40 @@
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+pwa.ts:46 Service Worker registered successfully
+client:536 WebSocket connection to 'wss://ca701e48-3417-4cb1-8113-1e3eff229f91-00-1gw0segdkrq89.riker.replit.dev/?token=OXWYlhmJn73s' failed: 
+setupWebSocket @ client:536
+(anonymous) @ client:531Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=OXWYlhmJn73s' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+setupWebSocket @ client:536
+fallback @ client:509
+(anonymous) @ client:555Understand this error
+queryClient.ts:32  GET https://ca701e48-3417-4cb1-8113-1e3eff229f91-00-1gw0segdkrq89.riker.replit.dev/api/auth/user 401 (Unauthorized)
+(anonymous) @ queryClient.ts:32
+fetchFn @ @tanstack_react-query.js?v=3559c40b:840
+run @ @tanstack_react-query.js?v=3559c40b:494
+start @ @tanstack_react-query.js?v=3559c40b:536
+fetch @ @tanstack_react-query.js?v=3559c40b:926
+executeFetch_fn @ @tanstack_react-query.js?v=3559c40b:2211
+onSubscribe @ @tanstack_react-query.js?v=3559c40b:1898
+subscribe @ @tanstack_react-query.js?v=3559c40b:24
+(anonymous) @ @tanstack_react-query.js?v=3559c40b:3022
+subscribeToStore @ chunk-RPCDYKBN.js?v=3559c40b:11984
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=3559c40b:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=3559c40b:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=3559c40b:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=3559c40b:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=3559c40b:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=3559c40b:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=3559c40b:19447
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=3559c40b:18868
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=3559c40b:9119
+commitRootImpl @ chunk-RPCDYKBN.js?v=3559c40b:19432
+commitRoot @ chunk-RPCDYKBN.js?v=3559c40b:19277
+finishConcurrentRender @ chunk-RPCDYKBN.js?v=3559c40b:18805
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=3559c40b:18718
+workLoop @ chunk-RPCDYKBN.js?v=3559c40b:197
+flushWork @ chunk-RPCDYKBN.js?v=3559c40b:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=3559c40b:384Understand this error
+ca701e48-3417-4cb1-8113-1e3eff229f91-00-1gw0segdkrq89.riker.replit.dev/:1 Error while trying to use the following icon from the Manifest: https://ca701e48-3417-4cb1-8113-1e3eff229f91-00-1gw0segdkrq89.riker.replit.dev/icon-192.png (Download error or resource isn't a valid image)Understand this error

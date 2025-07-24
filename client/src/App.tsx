@@ -12,6 +12,8 @@ import Practice from "@/pages/practice";
 import Admin from "@/pages/admin";
 import AdminStudents from "@/pages/admin-students";
 import Progress from "@/pages/progress";
+import { PWAUpdateNotification } from "@/components/PWAInstallButton";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -42,6 +44,8 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <PWAUpdateNotification />
+        <OfflineIndicator />
       </TooltipProvider>
     </QueryClientProvider>
   );

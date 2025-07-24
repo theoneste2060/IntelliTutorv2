@@ -19,6 +19,7 @@ import {
   LogOut,
   User
 } from "lucide-react";
+import { PWAInstallButton } from "@/components/PWAInstallButton";
 import { Link, useLocation } from "wouter";
 
 export default function Navigation() {
@@ -148,6 +149,9 @@ export default function Navigation() {
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
+            {/* PWA Install Button */}
+            <PWAInstallButton />
+
             {/* Theme Toggle */}
             <Button
               variant="ghost"

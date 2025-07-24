@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Brain, BookOpen, Users, Award } from "lucide-react";
+import { Brain, BookOpen, Users, Award, ArrowLeft } from "lucide-react";
 
 export default function Login() {
   const [adminCredentials, setAdminCredentials] = useState({
@@ -15,9 +16,14 @@ export default function Login() {
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
+  };
+
+  const handleGoBack = () => {
+    setLocation("/");
   };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -103,6 +109,14 @@ export default function Login() {
             </div>
           </div>
 
+          <Button
+            onClick={handleGoBack}
+            variant="outline"
+            className="mt-6 flex items-center space-x-2 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Go Back</span>
+          </Button>
 
         </div>
 
