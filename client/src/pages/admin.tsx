@@ -7,6 +7,8 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
 import AdminTable from "@/components/AdminTable";
 import StatsCard from "@/components/StatsCard";
+import EditQuestionDialog from "@/components/EditQuestionDialog";
+import ViewQuestionDialog from "@/components/ViewQuestionDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,6 +22,14 @@ export default function Admin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [verificationFilter, setVerificationFilter] = useState("all");
+  const [editingQuestion, setEditingQuestion] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [viewingQuestion, setViewingQuestion] = useState<any>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     subject: "",
@@ -50,9 +60,18 @@ export default function Admin() {
   });
 
   const { data: questionsData, isLoading: questionsLoading, refetch: refetchQuestions } = useQuery({
-    queryKey: ["/api/admin/questions", currentPage],
+    queryKey: ["/api/admin/questions", currentPage, pageSize, searchTerm, subjectFilter, verificationFilter],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/admin/questions?page=${currentPage}&limit=20`);
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+      });
+      
+      if (searchTerm) params.append('search', searchTerm);
+      if (subjectFilter !== 'all') params.append('subject', subjectFilter);
+      if (verificationFilter !== 'all') params.append('verified', verificationFilter === 'verified' ? 'true' : 'false');
+      
+      const response = await apiRequest("GET", `/api/admin/questions?${params.toString()}`);
       return response.json();
     },
     retry: false,
@@ -187,13 +206,18 @@ export default function Admin() {
     },
   });
 
-  const handleEditQuestion = (questionId: number, updates: any) => {
-    // For now, just show the current values - in a real app you'd show an edit dialog
-    console.log("Edit question:", questionId, updates);
-    toast({
-      title: "Feature Coming Soon",
-      description: "Question editing dialog will be implemented soon",
-    });
+  const handleEditQuestion = (questionId: number, question: any) => {
+    setEditingQuestion(question);
+    setEditDialogOpen(true);
+  };
+
+  const handleViewQuestion = (question: any) => {
+    setViewingQuestion(question);
+    setViewDialogOpen(true);
+  };
+
+  const handleSaveQuestion = (questionId: number, updates: any) => {
+    editQuestionMutation.mutate({ questionId, updates });
   };
 
   const handleDeleteQuestion = (questionId: number) => {
@@ -204,6 +228,11 @@ export default function Admin() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
   };
 
   const handleUploadSubmit = (e: React.FormEvent) => {
@@ -390,103 +419,7 @@ export default function Admin() {
             />
           </div>
 
-          {/* Document Processing & AI Management */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <Card className="bg-card p-6 rounded-lg elevation-1">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl font-semibold flex items-center">
-                  <FileText className="text-red-600 mr-2" />
-                  Document Processing Pipeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-4">
-                  {/* OCR Processing Status */}
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">OCR Processing</span>
-                      <span className="text-sm bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">Ready</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <p>System ready to process uploaded documents</p>
-                      <p className="text-blue-600">Processing pipeline: Active</p>
-                    </div>
-                  </div>
 
-                  {/* AI Generation Status */}
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">AI Answer Generation</span>
-                      <span className="text-sm bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded">Online</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <p>OpenAI GPT-4o model ready</p>
-                      <p className="text-green-600">Model answers generated automatically</p>
-                    </div>
-                  </div>
-
-                  <Button className="w-full btn-primary" onClick={() => setUploadDialogOpen(true)}>
-                    <Upload className="mr-2 w-4 h-4" />
-                    Upload New Exam Papers
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card p-6 rounded-lg elevation-1">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl font-semibold flex items-center">
-                  <Brain className="text-primary mr-2" />
-                  NLP & AI Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-4">
-                  {/* NLP Techniques Performance */}
-                  <div>
-                    <h4 className="font-medium mb-2">Evaluation Techniques Performance</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">TF-IDF Similarity</span>
-                        <span className="text-sm font-medium">94.2%</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">spaCy NLP Analysis</span>
-                        <span className="text-sm font-medium">91.8%</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">NLTK Processing</span>
-                        <span className="text-sm font-medium">89.5%</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Grammar Check</span>
-                        <span className="text-sm font-medium">97.1%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* AI Model Status */}
-                  <div className="p-3 bg-muted/50 dark:bg-muted/20 rounded-lg">
-                    <h4 className="font-medium mb-2">AI Model Status</h4>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Generative AI Model</span>
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                        <span>Online</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm mt-1">
-                      <span>Question Recommendations</span>
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                        <span>Active</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Question Management Table */}
           <AdminTable
@@ -494,12 +427,43 @@ export default function Admin() {
             loading={questionsLoading}
             total={questionsData?.total || 0}
             page={currentPage}
+            pageSize={pageSize}
+            searchTerm={searchTerm}
+            subjectFilter={subjectFilter}
+            verificationFilter={verificationFilter}
             onVerifyQuestion={(questionId, isVerified) => 
               verifyQuestionMutation.mutate({ questionId, isVerified })
             }
             onEditQuestion={handleEditQuestion}
             onDeleteQuestion={handleDeleteQuestion}
+            onViewQuestion={handleViewQuestion}
             onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onSearchChange={setSearchTerm}
+            onSubjectFilterChange={setSubjectFilter}
+            onVerificationFilterChange={setVerificationFilter}
+          />
+
+          {/* Edit Question Dialog */}
+          <EditQuestionDialog
+            question={editingQuestion}
+            open={editDialogOpen}
+            onClose={() => {
+              setEditDialogOpen(false);
+              setEditingQuestion(null);
+            }}
+            onSave={handleSaveQuestion}
+            isLoading={editQuestionMutation.isPending}
+          />
+
+          {/* View Question Dialog */}
+          <ViewQuestionDialog
+            question={viewingQuestion}
+            isOpen={viewDialogOpen}
+            onClose={() => {
+              setViewDialogOpen(false);
+              setViewingQuestion(null);
+            }}
           />
         </section>
       </div>

@@ -211,8 +211,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
-      const result = await storage.getAllQuestions(page, limit);
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const subject = req.query.subject as string;
+      const verified = req.query.verified as string;
+
+      const filters = {
+        search,
+        subject: subject && subject !== 'all' ? subject : undefined,
+        verified: verified !== undefined ? verified === 'true' : undefined
+      };
+
+      const result = await storage.getAllQuestions(page, limit, filters);
       res.json(result);
     } catch (error) {
       console.error("Error fetching admin questions:", error);
@@ -299,6 +309,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching progress:", error);
       res.status(500).json({ message: "Failed to fetch progress" });
+    }
+  });
+
+  app.get('/api/progress/performance-trend', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const trend = await storage.getPerformanceTrend(userId);
+      res.json(trend);
+    } catch (error) {
+      console.error("Error fetching performance trend:", error);
+      res.status(500).json({ message: "Failed to fetch performance trend" });
+    }
+  });
+
+  app.get('/api/progress/subject-performance', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const subjectPerformance = await storage.getSubjectPerformance(userId);
+      res.json(subjectPerformance);
+    } catch (error) {
+      console.error("Error fetching subject performance:", error);
+      res.status(500).json({ message: "Failed to fetch subject performance" });
+    }
+  });
+
+  app.get('/api/progress/study-insights', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const insights = await storage.getStudyInsights(userId);
+      res.json(insights);
+    } catch (error) {
+      console.error("Error fetching study insights:", error);
+      res.status(500).json({ message: "Failed to fetch study insights" });
+    }
+  });
+
+  app.get('/api/progress/study-goals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const goals = await storage.getStudyGoals(userId);
+      res.json(goals);
+    } catch (error) {
+      console.error("Error fetching study goals:", error);
+      res.status(500).json({ message: "Failed to fetch study goals" });
     }
   });
 

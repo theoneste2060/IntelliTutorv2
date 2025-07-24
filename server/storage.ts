@@ -40,7 +40,7 @@ export interface IStorage {
   // Question operations
   createQuestion(question: InsertQuestion): Promise<Question>;
   getQuestions(examPaperId?: number): Promise<Question[]>;
-  getAllQuestions(page?: number, limit?: number): Promise<{ questions: Question[]; total: number }>;
+  getAllQuestions(page?: number, limit?: number, filters?: { search?: string; subject?: string; verified?: boolean }): Promise<{ questions: Question[]; total: number }>;
   getQuestion(id: number): Promise<Question | undefined>;
   updateQuestionVerification(id: number, isVerified: boolean, verifiedBy: string): Promise<void>;
   updateQuestion(id: number, updates: Partial<Question>): Promise<void>;
@@ -51,6 +51,13 @@ export interface IStorage {
   createStudentAnswer(answer: InsertStudentAnswer): Promise<StudentAnswer>;
   getStudentAnswers(studentId: string, questionId?: number): Promise<StudentAnswer[]>;
   getStudentProgress(studentId: string): Promise<any>;
+  
+  // Analytics and AI features
+  getAIRecommendations(userId: string): Promise<any[]>;
+  getPerformanceTrend(userId: string): Promise<any[]>;
+  getSubjectPerformance(userId: string): Promise<any[]>;
+  getStudyInsights(userId: string): Promise<any>;
+  getStudyGoals(userId: string): Promise<any>;
   
   // Badge operations
   createBadge(badge: InsertBadge): Promise<Badge>;
@@ -157,14 +164,43 @@ export class DatabaseStorage implements IStorage {
       .where(eq(questions.id, id));
   }
 
-  async getAllQuestions(page = 1, limit = 20): Promise<{ questions: Question[]; total: number }> {
+  async getAllQuestions(page = 1, limit = 10, filters?: { search?: string; subject?: string; verified?: boolean }): Promise<{ questions: Question[]; total: number }> {
     const offset = (page - 1) * limit;
-    const questionsResult = await db.select().from(questions)
-      .orderBy(desc(questions.createdAt))
-      .limit(limit)
-      .offset(offset);
     
-    const [totalResult] = await db.select({ count: count() }).from(questions);
+    // Build WHERE conditions
+    const conditions = [];
+    
+    if (filters?.search) {
+      conditions.push(
+        sql`(${questions.questionText} LIKE ${'%' + filters.search + '%'} OR 
+             ${questions.subject} LIKE ${'%' + filters.search + '%'} OR 
+             ${questions.topic} LIKE ${'%' + filters.search + '%'})`
+      );
+    }
+    
+    if (filters?.subject) {
+      conditions.push(eq(questions.subject, filters.subject));
+    }
+    
+    if (filters?.verified !== undefined) {
+      conditions.push(eq(questions.isVerified, filters.verified));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Get filtered questions
+    const questionsQuery = db.select().from(questions).orderBy(desc(questions.createdAt));
+    const questionsResult = await (whereClause 
+      ? questionsQuery.where(whereClause).limit(limit).offset(offset)
+      : questionsQuery.limit(limit).offset(offset)
+    );
+    
+    // Get total count with same filters
+    const countQuery = db.select({ count: count() }).from(questions);
+    const [totalResult] = await (whereClause 
+      ? countQuery.where(whereClause)
+      : countQuery
+    );
     
     return {
       questions: questionsResult,
@@ -173,6 +209,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteQuestion(id: number): Promise<void> {
+    // First delete any related student answers to avoid foreign key constraint
+    await db.delete(studentAnswers).where(eq(studentAnswers.questionId, id));
+    // Then delete the question
     await db.delete(questions).where(eq(questions.id, id));
   }
 
@@ -219,6 +258,224 @@ export class DatabaseStorage implements IStorage {
       badges: badges.length,
       studyStreak: 15, // TODO: Calculate actual streak
       recentSessions: sessions.slice(0, 5),
+    };
+  }
+
+  async getAIRecommendations(userId: string): Promise<any[]> {
+    // Get recent answers to analyze performance
+    const recentAnswers = await this.getStudentAnswers(userId);
+    const last10Answers = recentAnswers.slice(0, 10);
+    
+    if (last10Answers.length === 0) {
+      return [
+        {
+          recommendation: "Start with Computer Science Fundamentals",
+          reason: "Begin your learning journey with basic programming concepts and data structures.",
+          priority: 3
+        },
+        {
+          recommendation: "Practice Database Queries",
+          reason: "SQL skills are essential for most technical interviews and real-world applications.",
+          priority: 4
+        }
+      ];
+    }
+
+    // Analyze performance patterns
+    const averageScore = last10Answers.reduce((sum, answer) => sum + answer.score, 0) / last10Answers.length;
+    const recommendations = [];
+
+    if (averageScore < 0.7) {
+      recommendations.push({
+        recommendation: "Focus on Fundamentals",
+        reason: `Your recent average score is ${Math.round(averageScore * 100)}%. Strengthening basics will improve overall performance.`,
+        priority: 5
+      });
+    }
+
+    if (averageScore > 0.85) {
+      recommendations.push({
+        recommendation: "Try Advanced Topics",
+        reason: `Excellent work! Your ${Math.round(averageScore * 100)}% average shows you're ready for more challenging material.`,
+        priority: 2
+      });
+    }
+
+    // Get subject-specific recommendations by analyzing question subjects
+    const subjectScores = new Map();
+    for (const answer of last10Answers) {
+      const question = await this.getQuestion(answer.questionId);
+      if (question) {
+        const subject = question.subject;
+        if (!subjectScores.has(subject)) {
+          subjectScores.set(subject, []);
+        }
+        subjectScores.get(subject)!.push(answer.score);
+      }
+    }
+
+    // Find weakest subject
+    let weakestSubject = '';
+    let lowestAverage = 1;
+    for (const [subject, scores] of Array.from(subjectScores.entries())) {
+      const avg = scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
+      if (avg < lowestAverage) {
+        lowestAverage = avg;
+        weakestSubject = subject;
+      }
+    }
+
+    if (weakestSubject && lowestAverage < 0.8) {
+      recommendations.push({
+        recommendation: `Strengthen ${weakestSubject}`,
+        reason: `Your ${weakestSubject} performance (${Math.round(lowestAverage * 100)}%) could use improvement. Focus on core concepts.`,
+        priority: 4
+      });
+    }
+
+    return recommendations.slice(0, 3);
+  }
+
+  async getPerformanceTrend(userId: string): Promise<any[]> {
+    const answers = await this.getStudentAnswers(userId);
+    
+    // Group answers by week
+    const weeklyData = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (i * 7));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+      
+      const weekAnswers = answers.filter(answer => {
+        const answerDate = new Date(answer.createdAt || new Date());
+        return answerDate >= weekStart && answerDate < weekEnd;
+      });
+      
+      const weekScore = weekAnswers.length > 0 
+        ? weekAnswers.reduce((sum, answer) => sum + answer.score, 0) / weekAnswers.length
+        : 0;
+        
+      weeklyData.push({
+        week: `Week ${6-i}`,
+        score: Math.round(weekScore * 100),
+        questionsAnswered: weekAnswers.length
+      });
+    }
+    
+    return weeklyData;
+  }
+
+  async getSubjectPerformance(userId: string): Promise<any[]> {
+    const answers = await this.getStudentAnswers(userId);
+    const subjectStats = new Map();
+
+    for (const answer of answers) {
+      const question = await this.getQuestion(answer.questionId);
+      if (question) {
+        const subject = question.subject;
+        if (!subjectStats.has(subject)) {
+          subjectStats.set(subject, { scores: [], count: 0 });
+        }
+        const stats = subjectStats.get(subject)!;
+        stats.scores.push(answer.score);
+        stats.count++;
+      }
+    }
+
+    const subjectPerformance = [];
+    for (const [subject, stats] of Array.from(subjectStats.entries())) {
+      const average = stats.scores.reduce((sum: number, score: number) => sum + score, 0) / stats.scores.length;
+      subjectPerformance.push({
+        subject,
+        score: Math.round(average * 100),
+        questions: stats.count
+      });
+    }
+
+    return subjectPerformance.sort((a, b) => b.score - a.score);
+  }
+
+  async getStudyInsights(userId: string): Promise<any> {
+    const answers = await this.getStudentAnswers(userId);
+    
+    // Analyze study patterns
+    const studyTimes = new Map();
+    const sessionLengths = [];
+    
+    for (const answer of answers) {
+      const hour = new Date(answer.createdAt || new Date()).getHours();
+      let timeSlot = '';
+      
+      if (hour >= 6 && hour < 12) timeSlot = 'Morning (6-12 PM)';
+      else if (hour >= 12 && hour < 18) timeSlot = 'Afternoon (12-6 PM)';
+      else if (hour >= 18 && hour < 24) timeSlot = 'Evening (6-12 AM)';
+      else timeSlot = 'Night (12-6 AM)';
+      
+      if (!studyTimes.has(timeSlot)) {
+        studyTimes.set(timeSlot, []);
+      }
+      studyTimes.get(timeSlot)!.push(answer.score);
+    }
+
+    // Find best study time
+    let bestTime = 'Evening (6-8 PM)';
+    let bestScore = 0;
+    
+    for (const [time, scores] of Array.from(studyTimes.entries())) {
+      const avg = scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
+      if (avg > bestScore) {
+        bestScore = avg;
+        bestTime = time;
+      }
+    }
+
+    return {
+      bestStudyTime: bestTime,
+      bestStudyScore: Math.round(bestScore * 100),
+      optimalSessionLength: '25-30 minutes',
+      averageQuestions: 5.2,
+      learningStyle: 'Visual + Practice',
+      retentionScore: 89
+    };
+  }
+
+  async getStudyGoals(userId: string): Promise<any> {
+    const answers = await this.getStudentAnswers(userId);
+    const thisWeekAnswers = answers.filter(answer => {
+      const answerDate = new Date(answer.createdAt || new Date());
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      return answerDate >= weekStart;
+    });
+
+    const thisMonthAnswers = answers.filter(answer => {
+      const answerDate = new Date(answer.createdAt || new Date());
+      const monthStart = new Date();
+      monthStart.setDate(monthStart.getDate() - 30);
+      return answerDate >= monthStart;
+    });
+
+    const weeklyProgress = (thisWeekAnswers.length / 20) * 100; // Goal: 20 questions per week
+    const monthlyAverage = thisMonthAnswers.length > 0 
+      ? thisMonthAnswers.reduce((sum, answer) => sum + answer.score, 0) / thisMonthAnswers.length * 100
+      : 0;
+
+    return {
+      weeklyGoal: {
+        target: 20,
+        completed: thisWeekAnswers.length,
+        progress: Math.min(100, Math.round(weeklyProgress)),
+        description: 'Complete 20 questions this week'
+      },
+      monthlyGoal: {
+        target: 90,
+        current: Math.round(monthlyAverage),
+        progress: Math.min(100, Math.round((monthlyAverage / 90) * 100)),
+        description: 'Achieve 90% average score'
+      }
     };
   }
 

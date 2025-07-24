@@ -58,6 +58,30 @@ export default function Progress() {
     enabled: isAuthenticated,
   });
 
+  const { data: performanceTrend, isLoading: trendLoading } = useQuery({
+    queryKey: ["/api/progress/performance-trend"],
+    retry: false,
+    enabled: isAuthenticated,
+  });
+
+  const { data: subjectPerformance, isLoading: subjectLoading } = useQuery({
+    queryKey: ["/api/progress/subject-performance"],
+    retry: false,
+    enabled: isAuthenticated,
+  });
+
+  const { data: studyInsights, isLoading: insightsLoading } = useQuery({
+    queryKey: ["/api/progress/study-insights"],
+    retry: false,
+    enabled: isAuthenticated,
+  });
+
+  const { data: studyGoals, isLoading: goalsLoading } = useQuery({
+    queryKey: ["/api/progress/study-goals"],
+    retry: false,
+    enabled: isAuthenticated,
+  });
+
   if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -65,15 +89,6 @@ export default function Progress() {
       </div>
     );
   }
-
-  const mockPerformanceData = [
-    { week: "Week 1", score: 65 },
-    { week: "Week 2", score: 72 },
-    { week: "Week 3", score: 78 },
-    { week: "Week 4", score: 85 },
-    { week: "Week 5", score: 88 },
-    { week: "Week 6", score: 92 },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -95,34 +110,51 @@ export default function Progress() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-4">
-                  {/* Performance Progress Bars */}
-                  {mockPerformanceData.map((data, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{data.week}</span>
-                        <span className="text-sm text-muted-foreground">{data.score}%</span>
-                      </div>
-                      <ProgressBar value={data.score} className="h-3" />
+                  {trendLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="spinner"></div>
                     </div>
-                  ))}
+                  ) : performanceTrend && performanceTrend.length > 0 ? (
+                    /* Performance Progress Bars */
+                    performanceTrend.map((data: any, index: number) => (
+                      <div key={index} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">{data.week}</span>
+                          <span className="text-sm text-muted-foreground">{data.score}%</span>
+                        </div>
+                        <ProgressBar value={data.score} className="h-3" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <p>No performance data available yet.</p>
+                      <p className="text-sm">Start answering questions to see your progress!</p>
+                    </div>
+                  )}
                   
                   {/* Overall Progress Summary */}
-                  <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-primary">Overall Improvement</p>
-                        <p className="text-sm text-muted-foreground">
-                          +27% from Week 1 to Week 6
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary">
-                          {progressData?.averageScore || 0}%
+                  {performanceTrend && performanceTrend.length > 0 && (
+                    <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-primary">Overall Improvement</p>
+                          <p className="text-sm text-muted-foreground">
+                            {performanceTrend.length >= 2 ? (
+                              `${performanceTrend[performanceTrend.length - 1].score - performanceTrend[0].score > 0 ? '+' : ''}${performanceTrend[performanceTrend.length - 1].score - performanceTrend[0].score}% from ${performanceTrend[0].week} to ${performanceTrend[performanceTrend.length - 1].week}`
+                            ) : (
+                              'Track your improvement over time'
+                            )}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">Current Average</p>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-primary">
+                            {progressData?.averageScore || 0}%
+                          </div>
+                          <p className="text-xs text-muted-foreground">Current Average</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -175,7 +207,12 @@ export default function Progress() {
                               >
                                 Priority: {rec.priority}/5
                               </Badge>
-                              <Button size="sm" variant="ghost" className="text-xs">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-xs"
+                                onClick={() => window.location.href = '/practice'}
+                              >
                                 Practice Now <ArrowRight className="w-3 h-3 ml-1" />
                               </Button>
                             </div>
@@ -194,7 +231,12 @@ export default function Progress() {
                             <p className="text-sm text-muted-foreground mt-1">
                               Based on your recent answers, practicing SQL JOIN operations will improve your database scores by an estimated 15%.
                             </p>
-                            <Button size="sm" variant="ghost" className="text-primary text-sm mt-2 p-0 h-auto">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="text-primary text-sm mt-2 p-0 h-auto"
+                              onClick={() => window.location.href = '/practice'}
+                            >
                               Practice Now <ArrowRight className="w-3 h-3 ml-1" />
                             </Button>
                           </div>
@@ -209,7 +251,12 @@ export default function Progress() {
                             <p className="text-sm text-muted-foreground mt-1">
                               You've mastered basic algorithms! Time to tackle Big O notation and advanced complexity analysis.
                             </p>
-                            <Button size="sm" variant="ghost" className="text-secondary text-sm mt-2 p-0 h-auto">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="text-secondary text-sm mt-2 p-0 h-auto"
+                              onClick={() => window.location.href = '/practice'}
+                            >
                               Start Challenge <ArrowRight className="w-3 h-3 ml-1" />
                             </Button>
                           </div>
@@ -234,23 +281,29 @@ export default function Progress() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-3">
-                  {[
-                    { subject: "Database Systems", score: 92, questions: 45 },
-                    { subject: "Algorithms", score: 87, questions: 32 },
-                    { subject: "Data Structures", score: 78, questions: 28 },
-                    { subject: "OOP Concepts", score: 85, questions: 35 },
-                  ].map((item, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{item.subject}</span>
-                        <div className="text-right">
-                          <span className="text-sm font-semibold">{item.score}%</span>
-                          <p className="text-xs text-muted-foreground">{item.questions} questions</p>
-                        </div>
-                      </div>
-                      <ProgressBar value={item.score} className="h-2" />
+                  {subjectLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="spinner"></div>
                     </div>
-                  ))}
+                  ) : subjectPerformance && subjectPerformance.length > 0 ? (
+                    subjectPerformance.map((item: any, index: number) => (
+                      <div key={index} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">{item.subject}</span>
+                          <div className="text-right">
+                            <span className="text-sm font-semibold">{item.score}%</span>
+                            <p className="text-xs text-muted-foreground">{item.questions} questions</p>
+                          </div>
+                        </div>
+                        <ProgressBar value={item.score} className="h-2" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <p>No subject data available yet.</p>
+                      <p className="text-sm">Answer questions to see performance by subject!</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -265,27 +318,39 @@ export default function Progress() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-4">
-                  <div className="p-3 bg-secondary/10 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Weekly Goal</span>
-                      <span className="text-sm text-secondary font-semibold">85%</span>
+                  {goalsLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="spinner"></div>
                     </div>
-                    <ProgressBar value={85} className="h-2 mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      Complete 20 questions this week
-                    </p>
-                  </div>
-                  
-                  <div className="p-3 bg-accent/10 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Monthly Goal</span>
-                      <span className="text-sm text-accent font-semibold">72%</span>
+                  ) : studyGoals ? (
+                    <>
+                      <div className="p-3 bg-secondary/10 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Weekly Goal</span>
+                          <span className="text-sm text-secondary font-semibold">{studyGoals.weeklyGoal?.progress || 0}%</span>
+                        </div>
+                        <ProgressBar value={studyGoals.weeklyGoal?.progress || 0} className="h-2 mb-2" />
+                        <p className="text-xs text-muted-foreground">
+                          {studyGoals.weeklyGoal?.description || 'Complete 20 questions this week'}
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 bg-accent/10 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Monthly Goal</span>
+                          <span className="text-sm text-accent font-semibold">{studyGoals.monthlyGoal?.progress || 0}%</span>
+                        </div>
+                        <ProgressBar value={studyGoals.monthlyGoal?.progress || 0} className="h-2 mb-2" />
+                        <p className="text-xs text-muted-foreground">
+                          {studyGoals.monthlyGoal?.description || 'Achieve 90% average score'}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <p>Setting up your goals...</p>
                     </div>
-                    <ProgressBar value={72} className="h-2 mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      Achieve 90% average score
-                    </p>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -300,38 +365,51 @@ export default function Progress() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Best Study Time</p>
-                      <p className="text-xs text-muted-foreground">Evening (6-8 PM)</p>
+                  {insightsLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="spinner"></div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-primary">94%</p>
-                      <p className="text-xs text-muted-foreground">Avg Score</p>
+                  ) : studyInsights ? (
+                    <>
+                      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">Best Study Time</p>
+                          <p className="text-xs text-muted-foreground">{studyInsights.bestStudyTime || 'Evening (6-8 PM)'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-primary">{studyInsights.bestStudyScore || 94}%</p>
+                          <p className="text-xs text-muted-foreground">Avg Score</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">Optimal Session</p>
+                          <p className="text-xs text-muted-foreground">{studyInsights.optimalSessionLength || '25-30 minutes'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-secondary">{studyInsights.averageQuestions || 5.2}</p>
+                          <p className="text-xs text-muted-foreground">Questions</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">Learning Style</p>
+                          <p className="text-xs text-muted-foreground">{studyInsights.learningStyle || 'Visual + Practice'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-accent">{studyInsights.retentionScore || 89}%</p>
+                          <p className="text-xs text-muted-foreground">Retention</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <p>No insights available yet.</p>
+                      <p className="text-sm">Answer more questions to unlock insights!</p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Optimal Session</p>
-                      <p className="text-xs text-muted-foreground">25-30 minutes</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-secondary">5.2</p>
-                      <p className="text-xs text-muted-foreground">Questions</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Learning Style</p>
-                      <p className="text-xs text-muted-foreground">Visual + Practice</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-accent">89%</p>
-                      <p className="text-xs text-muted-foreground">Retention</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Edit, Check, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit, Check, Trash2, Search, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 
 interface Question {
   id: number;
@@ -39,41 +39,39 @@ interface AdminTableProps {
   loading: boolean;
   total: number;
   page: number;
+  pageSize: number;
+  searchTerm: string;
+  subjectFilter: string;
+  verificationFilter: string;
   onVerifyQuestion: (questionId: number, isVerified: boolean) => void;
-  onEditQuestion: (questionId: number, updates: Partial<Question>) => void;
+  onEditQuestion: (questionId: number, question: Question) => void;
   onDeleteQuestion: (questionId: number) => void;
+  onViewQuestion: (question: Question) => void;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  onSearchChange: (search: string) => void;
+  onSubjectFilterChange: (subject: string) => void;
+  onVerificationFilterChange: (verification: string) => void;
 }
 
 export default function AdminTable({ 
   questions, 
   loading, 
   total, 
-  page, 
+  page,
+  pageSize,
+  searchTerm,
+  subjectFilter,
+  verificationFilter,
   onVerifyQuestion, 
   onEditQuestion, 
   onDeleteQuestion, 
-  onPageChange 
+  onPageChange,
+  onPageSizeChange,
+  onSearchChange,
+  onSubjectFilterChange,
+  onVerificationFilterChange
 }: AdminTableProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [subjectFilter, setSubjectFilter] = useState("all");
-  const [verificationFilter, setVerificationFilter] = useState("all");
-
-  // Filter questions based on search term and filters
-  const filteredQuestions = questions.filter((question) => {
-    const matchesSearch = question.questionText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         question.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (question.topic && question.topic.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesSubject = subjectFilter === "all" || question.subject === subjectFilter;
-    
-    const matchesVerification = 
-      verificationFilter === "all" ||
-      (verificationFilter === "verified" && question.isVerified) ||
-      (verificationFilter === "pending" && !question.isVerified);
-
-    return matchesSearch && matchesSubject && matchesVerification;
-  });
 
   // Get unique subjects for filter dropdown
   const subjects = Array.from(new Set(questions.map(q => q.subject)));
@@ -119,8 +117,21 @@ export default function AdminTable({
         <div className="flex justify-between items-center">
           <CardTitle className="text-xl font-semibold">Question Management</CardTitle>
           <div className="flex items-center space-x-4">
+            {/* Page Size Selector */}
+            <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(parseInt(value))}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Subject Filter */}
-            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+            <Select value={subjectFilter} onValueChange={onSubjectFilterChange}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="All Subjects" />
               </SelectTrigger>
@@ -135,7 +146,7 @@ export default function AdminTable({
             </Select>
 
             {/* Verification Filter */}
-            <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+            <Select value={verificationFilter} onValueChange={onVerificationFilterChange}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
@@ -153,7 +164,7 @@ export default function AdminTable({
                 type="text"
                 placeholder="Search questions..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => onSearchChange(e.target.value)}
                 className="pl-10 w-64"
               />
             </div>
@@ -195,7 +206,7 @@ export default function AdminTable({
                 </TableRow>
               </TableHeader>
               <TableBody className="bg-card divide-y divide-border">
-                {filteredQuestions.length === 0 ? (
+                {questions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                       {searchTerm || subjectFilter !== "all" || verificationFilter !== "all"
@@ -204,7 +215,7 @@ export default function AdminTable({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredQuestions.map((question) => (
+                  questions.map((question) => (
                     <TableRow key={question.id} className="hover:bg-muted/30">
                       <TableCell className="px-6 py-4">
                         <div>
@@ -241,6 +252,14 @@ export default function AdminTable({
                         </div>
                       </TableCell>
                       <TableCell className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewQuestion(question)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue/10"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -281,7 +300,7 @@ export default function AdminTable({
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-border">
           <div className="text-sm text-muted-foreground">
-            Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, total)} of {total} questions
+            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} questions
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -294,13 +313,13 @@ export default function AdminTable({
               Previous
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {page} of {Math.ceil(total / 20)}
+              Page {page} of {Math.ceil(total / pageSize)}
             </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onPageChange(page + 1)}
-              disabled={page >= Math.ceil(total / 20)}
+              disabled={page >= Math.ceil(total / pageSize)}
             >
               Next
               <ChevronRight className="w-4 h-4" />

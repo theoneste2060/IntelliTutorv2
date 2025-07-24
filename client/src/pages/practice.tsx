@@ -199,17 +199,7 @@ export default function Practice() {
               </div>
               
               <div className="p-8">
-                {/* AI Processing Indicator */}
-                <div className="ai-indicator mb-6">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-primary rounded-full animate-pulse"></div>
-                    <span className="text-sm font-medium text-primary">AI-Generated Model Answer Available</span>
-                  </div>
-                  <div className="ml-auto flex items-center text-xs text-muted-foreground">
-                    <Brain className="mr-1 w-4 h-4" />
-                    NLP Analysis: spaCy + NLTK
-                  </div>
-                </div>
+                
 
                 <QuestionInterface
                   question={question}

@@ -174,18 +174,7 @@ export default function QuestionInterface({
         </div>
       )}
 
-      {/* Answer Guidelines */}
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <h5 className="font-medium text-blue-900 dark:text-blue-200 mb-2">
-          Tips for Better Answers:
-        </h5>
-        <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
-          <li>• Be specific and use technical terminology</li>
-          <li>• Provide examples where appropriate</li>
-          <li>• Structure your answer clearly</li>
-          <li>• Check spelling and grammar before submitting</li>
-        </ul>
-      </div>
+      
     </div>
   );
 }
